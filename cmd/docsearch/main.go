@@ -18,8 +18,8 @@ import (
 	"docsearch/pkg/updater"
 )
 
-const (
-	Version = "0.1.0"
+var (
+	Version = "0.1.4"
 	Banner  = `
   ___             ____                      _     
  |   \  ___  __  / ___|  ___  __ _ _ _ __ _| |_   
