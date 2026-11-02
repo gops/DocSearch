@@ -1,11 +1,9 @@
-package server
+package desktop
 
 import (
-	"embed"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io/fs"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -18,64 +16,77 @@ import (
 	"docsearch/pkg/extractor"
 	"docsearch/pkg/indexer"
 	"docsearch/pkg/updater"
+
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-//go:embed static/*
-var staticFS embed.FS
-
-// Server hosts the local search UI and REST API.
-type Server struct {
+// App manages the desktop window state, RPC bindings, and in-process API handler.
+type App struct {
+	ctx     context.Context
 	cfg     *config.Config
 	idx     *indexer.Indexer
 	crawler *crawler.Crawler
-	port    int
 	version string
 }
 
-// NewServer initializes the HTTP server.
-func NewServer(cfg *config.Config, idx *indexer.Indexer, c *crawler.Crawler, version string) *Server {
-	port := cfg.ServerPort
-	if port == 0 {
-		port = 9876
-	}
-	return &Server{
+// NewApp creates a new desktop application controller.
+func NewApp(cfg *config.Config, idx *indexer.Indexer, c *crawler.Crawler, version string) *App {
+	return &App{
 		cfg:     cfg,
 		idx:     idx,
 		crawler: c,
-		port:    port,
 		version: version,
 	}
 }
 
-// Start launches the HTTP server listening on 127.0.0.1.
-func (s *Server) Start() error {
-	mux := http.NewServeMux()
-
-	// Static asset handler
-	subFS, err := fs.Sub(staticFS, "static")
-	if err != nil {
-		return err
-	}
-	mux.Handle("/", http.FileServer(http.FS(subFS)))
-
-	// API routes
-	mux.HandleFunc("/api/search", s.handleSearch)
-	mux.HandleFunc("/api/folders", s.handleFolders)
-	mux.HandleFunc("/api/reindex", s.handleReindex)
-	mux.HandleFunc("/api/status", s.handleStatus)
-	mux.HandleFunc("/api/open", s.handleOpen)
-	mux.HandleFunc("/api/update/check", s.handleUpdateCheck)
-	mux.HandleFunc("/api/update/apply", s.handleUpdateApply)
-	mux.HandleFunc("/api/duplicates", s.handleDuplicates)
-	mux.HandleFunc("/api/file", s.handleDeleteFile)
-	mux.HandleFunc("/api/config", s.handleConfig)
-
-	addr := fmt.Sprintf("127.0.0.1:%d", s.port)
-	log.Printf("[Server] DocSearch UI active at http://%s\n", addr)
-	return http.ListenAndServe(addr, mux)
+// Startup is called by Wails when the desktop application initializes.
+func (a *App) Startup(ctx context.Context) {
+	a.ctx = ctx
 }
 
-func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
+// Show unhides and focuses the native desktop search window.
+func (a *App) Show() {
+	if a.ctx != nil {
+		wailsruntime.WindowShow(a.ctx)
+		wailsruntime.WindowUnminimise(a.ctx)
+		wailsruntime.WindowCenter(a.ctx)
+	}
+}
+
+// Hide minimizes the native window to the system tray.
+func (a *App) Hide() {
+	if a.ctx != nil {
+		wailsruntime.WindowHide(a.ctx)
+	}
+}
+
+// Quit terminates the desktop application.
+func (a *App) Quit() {
+	if a.ctx != nil {
+		wailsruntime.Quit(a.ctx)
+	}
+}
+
+// HTTPHandler returns an internal in-process HTTP handler for the frontend asset server.
+// This allows the desktop window to invoke API routes without opening any network ports.
+func (a *App) HTTPHandler() http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/api/search", a.handleSearch)
+	mux.HandleFunc("/api/folders", a.handleFolders)
+	mux.HandleFunc("/api/reindex", a.handleReindex)
+	mux.HandleFunc("/api/status", a.handleStatus)
+	mux.HandleFunc("/api/open", a.handleOpen)
+	mux.HandleFunc("/api/update/check", a.handleUpdateCheck)
+	mux.HandleFunc("/api/update/apply", a.handleUpdateApply)
+	mux.HandleFunc("/api/duplicates", a.handleDuplicates)
+	mux.HandleFunc("/api/file", a.handleDeleteFile)
+	mux.HandleFunc("/api/config", a.handleConfig)
+
+	return mux
+}
+
+func (a *App) handleSearch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	query := r.URL.Query().Get("q")
 	limitStr := r.URL.Query().Get("limit")
@@ -95,7 +106,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	results, err := s.idx.Search(query, limit)
+	results, err := a.idx.Search(query, limit)
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`{"error": %q}`, err.Error()), http.StatusInternalServerError)
 		return
@@ -104,12 +115,12 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(results)
 }
 
-func (s *Server) handleFolders(w http.ResponseWriter, r *http.Request) {
+func (a *App) handleFolders(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	switch r.Method {
 	case http.MethodGet:
-		folders := s.cfg.GetFolders()
+		folders := a.cfg.GetFolders()
 		_ = json.NewEncoder(w).Encode(folders)
 
 	case http.MethodPost:
@@ -121,16 +132,15 @@ func (s *Server) handleFolders(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		added, err := s.cfg.AddFolder(req.Path)
+		added, err := a.cfg.AddFolder(req.Path)
 		if err != nil {
 			http.Error(w, fmt.Sprintf(`{"error": %q}`, err.Error()), http.StatusBadRequest)
 			return
 		}
 
 		if added {
-			_ = s.cfg.Save()
-			// Rescan in background
-			go s.crawler.ScanAll()
+			_ = a.cfg.Save()
+			go a.crawler.ScanAll()
 		}
 
 		_ = json.NewEncoder(w).Encode(map[string]bool{"added": added})
@@ -144,9 +154,9 @@ func (s *Server) handleFolders(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		removed := s.cfg.RemoveFolder(req.Path)
+		removed := a.cfg.RemoveFolder(req.Path)
 		if removed {
-			_ = s.cfg.Save()
+			_ = a.cfg.Save()
 		}
 
 		_ = json.NewEncoder(w).Encode(map[string]bool{"removed": removed})
@@ -156,37 +166,37 @@ func (s *Server) handleFolders(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *Server) handleReindex(w http.ResponseWriter, r *http.Request) {
+func (a *App) handleReindex(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
 		return
 	}
-	go s.crawler.ScanAll()
+	go a.crawler.ScanAll()
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"status": "scanning started"})
 }
 
-func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
+func (a *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	crawlerStatus := s.crawler.GetStatus()
-	docCount, _ := s.idx.DocCount()
-	ocrAvail := extractor.IsOCRAvailable(s.cfg.OCRCommand)
+	crawlerStatus := a.crawler.GetStatus()
+	docCount, _ := a.idx.DocCount()
+	ocrAvail := extractor.IsOCRAvailable(a.cfg.OCRCommand)
 
 	resp := map[string]interface{}{
-		"is_indexing":       crawlerStatus.IsIndexing,
-		"indexed_count":     crawlerStatus.IndexedCount,
-		"total_files":       crawlerStatus.TotalFiles,
-		"doc_count":         docCount,
-		"ocr_available":     ocrAvail,
-		"max_file_size_mb":  s.cfg.MaxFileSizeMB,
-		"indexed_folders":   s.cfg.GetFolders(),
+		"is_indexing":      crawlerStatus.IsIndexing,
+		"indexed_count":    crawlerStatus.IndexedCount,
+		"total_files":      crawlerStatus.TotalFiles,
+		"doc_count":        docCount,
+		"ocr_available":    ocrAvail,
+		"max_file_size_mb": a.cfg.MaxFileSizeMB,
+		"indexed_folders":  a.cfg.GetFolders(),
 	}
 
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-func (s *Server) handleOpen(w http.ResponseWriter, r *http.Request) {
+func (a *App) handleOpen(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Path   string `json:"path"`
 		Reveal bool   `json:"reveal"`
@@ -216,12 +226,11 @@ func (s *Server) handleOpen(w http.ResponseWriter, r *http.Request) {
 		} else {
 			cmd = exec.Command("open", target)
 		}
-	default: // Linux and others
+	default:
 		cmd = exec.Command("xdg-open", target)
 	}
 
 	if err := cmd.Start(); err != nil {
-		log.Printf("[Server] Failed to open path %s: %v\n", target, err)
 		http.Error(w, fmt.Sprintf(`{"error": %q}`, err.Error()), http.StatusInternalServerError)
 		return
 	}
@@ -230,29 +239,29 @@ func (s *Server) handleOpen(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-func (s *Server) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
+func (a *App) handleUpdateCheck(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
-	repo := s.cfg.GitHubRepo
+	repo := a.cfg.GitHubRepo
 	if repo == "" {
 		repo = "gops/DocSearch"
 	}
 
-	rel, hasUpdate, err := updater.CheckLatestRelease(repo, s.version)
+	rel, hasUpdate, err := updater.CheckLatestRelease(repo, a.version)
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`{"error": %q}`, err.Error()), http.StatusInternalServerError)
 		return
 	}
 
 	resp := map[string]interface{}{
-		"current_version": s.version,
+		"current_version": a.version,
 		"has_update":      hasUpdate,
 		"release":         rel,
 	}
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-func (s *Server) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
+func (a *App) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
 		return
@@ -260,12 +269,12 @@ func (s *Server) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	repo := s.cfg.GitHubRepo
+	repo := a.cfg.GitHubRepo
 	if repo == "" {
 		repo = "gops/DocSearch"
 	}
 
-	rel, hasUpdate, err := updater.CheckLatestRelease(repo, s.version)
+	rel, hasUpdate, err := updater.CheckLatestRelease(repo, a.version)
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`{"error": %q}`, err.Error()), http.StatusInternalServerError)
 		return
@@ -287,9 +296,9 @@ func (s *Server) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleDuplicates(w http.ResponseWriter, r *http.Request) {
+func (a *App) handleDuplicates(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	report, err := s.idx.FindDuplicates()
+	report, err := a.idx.FindDuplicates()
 	if err != nil {
 		http.Error(w, fmt.Sprintf(`{"error": %q}`, err.Error()), http.StatusInternalServerError)
 		return
@@ -297,7 +306,7 @@ func (s *Server) handleDuplicates(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(report)
 }
 
-func (s *Server) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
+func (a *App) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
 		return
@@ -323,22 +332,21 @@ func (s *Server) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_ = s.idx.DeleteDocument(req.Path)
+	_ = a.idx.DeleteDocument(req.Path)
 
 	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
 
-func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
+func (a *App) handleConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
 	switch r.Method {
 	case http.MethodGet:
 		resp := map[string]interface{}{
-			"max_file_size_mb": s.cfg.MaxFileSizeMB,
-			"indexed_folders":  s.cfg.GetFolders(),
-			"ocr_enabled":      s.cfg.OCREnabled,
-			"ocr_command":      s.cfg.OCRCommand,
-			"server_port":      s.cfg.ServerPort,
+			"max_file_size_mb": a.cfg.MaxFileSizeMB,
+			"indexed_folders":  a.cfg.GetFolders(),
+			"ocr_enabled":      a.cfg.OCREnabled,
+			"ocr_command":      a.cfg.OCRCommand,
 		}
 		_ = json.NewEncoder(w).Encode(resp)
 
@@ -352,13 +360,13 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if req.MaxFileSizeMB != nil {
-			s.cfg.SetMaxFileSizeMB(*req.MaxFileSizeMB)
-			_ = s.cfg.Save()
+			a.cfg.SetMaxFileSizeMB(*req.MaxFileSizeMB)
+			_ = a.cfg.Save()
 		}
 
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
 			"success":          true,
-			"max_file_size_mb": s.cfg.MaxFileSizeMB,
+			"max_file_size_mb": a.cfg.MaxFileSizeMB,
 		})
 
 	default:

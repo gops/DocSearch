@@ -32,8 +32,8 @@ DocSearch indexes your local documents, PDFs, Word files, code, and scanned imag
   - **PDFs:** Digital text extraction via `pdftotext` with automatic fallback to OCR.
   - **Scanned Images (OCR):** Pluggable OCR interface supporting Tesseract or system OCR for `.png`, `.jpg`, `.jpeg`, `.tiff`.
 - **Dual Interface:**
-  - **Embedded Desktop / Web UI:** Responsive dark-themed search interface with live highlighted snippets, keyboard navigation, and one-click file opening.
-  - **CLI Mode:** Instant search, directory management, and status checks directly from your terminal.
+  - **Native Desktop Window (Wails):** Dedicated standalone desktop window (no external browser or open web server required). Sits in system tray and hides when closed.
+  - **CLI Mode:** Instant search, directory management, duplicate reports, and status checks directly from your terminal.
 - **100% Offline & Private:** Zero telemetry, no cloud API keys, all data stays locally on your machine.
 - **MIT Licensed:** Free and open source.
 
@@ -45,14 +45,15 @@ DocSearch indexes your local documents, PDFs, Word files, code, and scanned imag
 DocSearch
 ├── cmd/
 │   └── docsearch/         # Application entry point & CLI commands
+├── frontend/              # Embedded desktop UI assets (HTML, JS, CSS)
 ├── pkg/
 │   ├── config/            # JSON config management & folder list
+│   ├── desktop/           # Wails native desktop window & in-process IPC handlers
 │   ├── indexer/           # Bluge search engine, BM25 ranking, highlighter
 │   ├── crawler/           # Directory walker, worker pool, and fsnotify watcher
 │   ├── extractor/         # Text & OCR parsers (Plain text, DOCX, PDF, OCR)
 │   ├── updater/           # GitHub Releases self-updater & checksum verifier
-│   ├── tray/              # Cross-platform system tray integration (fyne.io/systray)
-│   └── server/            # Local HTTP server & embedded HTML/CSS/JS UI
+│   └── tray/              # Cross-platform system tray integration (fyne.io/systray)
 ├── .github/workflows/     # CI tests and automated GoReleaser release pipeline
 ├── .goreleaser.yaml       # Multi-platform release configuration
 ├── test_docs/             # Sample documents for verification
@@ -125,7 +126,7 @@ Scan all indexed directories for duplicate documents and wasted disk space:
 # Automatically download, verify, and update the binary
 ./docsearch update
 ```
-You can also click the **⚡ Update** button in the Web UI.
+You can also click the **⚡ Update** button in the desktop UI.
 
 ---
 

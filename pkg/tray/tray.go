@@ -17,16 +17,18 @@ type Tray struct {
 	crawler        *crawler.Crawler
 	version        string
 	onQuitCallback func()
+	onOpenWindow   func()
 }
 
 // New creates a new Tray controller.
-func New(cfg *config.Config, idx *indexer.Indexer, c *crawler.Crawler, version string, onQuit func()) *Tray {
+func New(cfg *config.Config, idx *indexer.Indexer, c *crawler.Crawler, version string, onQuit func(), onOpen func()) *Tray {
 	return &Tray{
 		cfg:            cfg,
 		idx:            idx,
 		crawler:        c,
 		version:        version,
 		onQuitCallback: onQuit,
+		onOpenWindow:   onOpen,
 	}
 }
 
