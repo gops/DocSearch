@@ -94,4 +94,18 @@ func TestServerAPI(t *testing.T) {
 	if wFolders.Code != http.StatusOK {
 		t.Fatalf("Expected 200 OK from /api/folders, got %d", wFolders.Code)
 	}
+
+	// 4. Test /api/duplicates
+	reqDupes := httptest.NewRequest(http.MethodGet, "/api/duplicates", nil)
+	wDupes := httptest.NewRecorder()
+	srv.handleDuplicates(wDupes, reqDupes)
+
+	if wDupes.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK from /api/duplicates, got %d", wDupes.Code)
+	}
+
+	var dupeReport indexer.DuplicateReport
+	if err := json.Unmarshal(wDupes.Body.Bytes(), &dupeReport); err != nil {
+		t.Fatalf("Failed to parse duplicates JSON: %v", err)
+	}
 }

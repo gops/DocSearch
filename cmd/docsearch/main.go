@@ -43,6 +43,9 @@ func main() {
 		case "reindex":
 			handleCLIReindex()
 			return
+		case "duplicates", "dupes":
+			handleCLIDuplicates()
+			return
 		case "check-update":
 			handleCLICheckUpdate()
 			return
@@ -236,6 +239,69 @@ func handleCLIReindex() {
 	c.ScanAll()
 	count, _ := idx.DocCount()
 	fmt.Printf("Re-indexing complete. Current total documents: %d\n", count)
+}
+
+func handleCLIDuplicates() {
+	cfg, err := config.Load("")
+	if err != nil {
+		log.Fatalf("Error loading config: %v", err)
+	}
+
+	idx, err := indexer.Open(cfg.IndexPath)
+	if err != nil {
+		log.Fatalf("Error opening index: %v", err)
+	}
+	defer idx.Close()
+
+	report, err := idx.FindDuplicates()
+	if err != nil {
+		log.Fatalf("Failed to scan for duplicates: %v", err)
+	}
+
+	if report.TotalGroups == 0 {
+		fmt.Println("\n✅ No duplicate files found across your indexed folders.")
+		return
+	}
+
+	wastedStr := formatByteSize(report.TotalWastedBytes)
+	fmt.Printf("\n📑 Found %d duplicate groups (%d redundant copies, %s wasted disk space):\n\n",
+		report.TotalGroups, report.TotalDuplicates, wastedStr)
+
+	for i, group := range report.Groups {
+		groupWasted := formatByteSize(group.WastedBytes)
+		fileSize := formatByteSize(group.Size)
+		hashSnippet := group.Hash
+		if len(hashSnippet) > 12 {
+			hashSnippet = hashSnippet[:12] + "..."
+		}
+
+		fmt.Printf("[Group %d] SHA-256: %s | Size: %s | Wasted: %s (%d copies)\n",
+			i+1, hashSnippet, fileSize, groupWasted, group.Count)
+
+		for j, f := range group.Files {
+			modStr := ""
+			if !f.ModTime.IsZero() {
+				modStr = fmt.Sprintf(" (Modified: %s)", f.ModTime.Format("2006-01-02 15:04"))
+			}
+			fmt.Printf("   [%d] %s%s\n", j+1, f.Path, modStr)
+		}
+		fmt.Println()
+	}
+}
+
+func formatByteSize(bytes int64) string {
+	if bytes <= 0 {
+		return "0 B"
+	}
+	const k = 1024
+	sizes := []string{"B", "KB", "MB", "GB", "TB"}
+	i := 0
+	val := float64(bytes)
+	for val >= 1024 && i < len(sizes)-1 {
+		val /= 1024
+		i++
+	}
+	return fmt.Sprintf("%.1f %s", val, sizes[i])
 }
 
 func handleCLICheckUpdate() {

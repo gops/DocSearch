@@ -22,6 +22,7 @@
           <span id="status-text">Idle</span>
         </div>
         <button id="btn-check-update" class="btn btn-secondary" title="Check for Updates">⚡ Update</button>
+        <button id="btn-duplicates" class="btn btn-secondary" title="Find duplicate documents">📑 Duplicates</button>
         <button id="btn-toggle-folders" class="btn btn-secondary" title="Manage Indexed Folders">
           📁 Folders (<span id="folder-count">0</span>)
         </button>
@@ -41,6 +42,23 @@
       <ul id="folder-list" class="folder-list"></ul>
       <div class="drawer-footer">
         <button id="btn-reindex" class="btn btn-warning">🔄 Trigger Re-scan</button>
+      </div>
+    </div>
+
+    <!-- Duplicates Drawer -->
+    <div id="duplicates-drawer" class="drawer hidden">
+      <div class="drawer-header">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <h3>Duplicate Documents</h3>
+          <span id="duplicates-summary" class="badge tag-ocr">Scanning...</span>
+        </div>
+        <span class="drawer-subtitle">Identical files across your folders sharing the same SHA-256 hash</span>
+      </div>
+      <div id="duplicates-container" class="duplicates-container">
+        <p class="empty-sub">Click "Refresh Duplicates" to scan your indexed documents.</p>
+      </div>
+      <div class="drawer-footer">
+        <button id="btn-refresh-dupes" class="btn btn-secondary">🔄 Refresh Duplicates</button>
       </div>
     </div>
 

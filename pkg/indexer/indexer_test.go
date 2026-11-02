@@ -72,3 +72,66 @@ func TestIndexerLifecycle(t *testing.T) {
 		t.Fatalf("Expected 0 documents after delete, got %d", countAfter)
 	}
 }
+func TestFindDuplicates(t *testing.T) {
+	tempDir := filepath.Join(os.TempDir(), "test_docsearch_dups")
+	_ = os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir)
+
+	idx, err := Open(tempDir)
+	if err != nil {
+		t.Fatalf("Open failed: %v", err)
+	}
+	defer idx.Close()
+
+	// 2 copies of file A (1000 bytes each)
+	_ = idx.IndexDocument(&Document{
+		ID:        "/docs/fileA.txt",
+		Path:      "/docs/fileA.txt",
+		Filename:  "fileA.txt",
+		Extension: ".txt",
+		Size:      1000,
+		ModTime:   time.Now(),
+		Content:   "Content of file A",
+		Hash:      "hashA",
+	})
+	_ = idx.IndexDocument(&Document{
+		ID:        "/backup/fileA_copy.txt",
+		Path:      "/backup/fileA_copy.txt",
+		Filename:  "fileA_copy.txt",
+		Extension: ".txt",
+		Size:      1000,
+		ModTime:   time.Now(),
+		Content:   "Content of file A",
+		Hash:      "hashA",
+	})
+
+	// 1 unique file B
+	_ = idx.IndexDocument(&Document{
+		ID:        "/docs/fileB.txt",
+		Path:      "/docs/fileB.txt",
+		Filename:  "fileB.txt",
+		Extension: ".txt",
+		Size:      5000,
+		ModTime:   time.Now(),
+		Content:   "Unique content B",
+		Hash:      "hashB",
+	})
+
+	report, err := idx.FindDuplicates()
+	if err != nil {
+		t.Fatalf("FindDuplicates failed: %v", err)
+	}
+
+	if report.TotalGroups != 1 {
+		t.Fatalf("Expected 1 duplicate group, got %d", report.TotalGroups)
+	}
+	if report.TotalDuplicates != 1 {
+		t.Fatalf("Expected 1 duplicate file, got %d", report.TotalDuplicates)
+	}
+	if report.TotalWastedBytes != 1000 {
+		t.Fatalf("Expected 1000 wasted bytes, got %d", report.TotalWastedBytes)
+	}
+	if len(report.Groups[0].Files) != 2 {
+		t.Fatalf("Expected 2 files in duplicate group, got %d", len(report.Groups[0].Files))
+	}
+}

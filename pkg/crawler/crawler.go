@@ -306,8 +306,7 @@ func calculateFileHash(filePath string) (string, error) {
 	defer f.Close()
 
 	hasher := sha256.New()
-	// Read first 1MB for fast hash comparison
-	if _, err := io.CopyN(hasher, f, 1024*1024); err != nil && err != io.EOF {
+	if _, err := io.Copy(hasher, f); err != nil {
 		return "", err
 	}
 

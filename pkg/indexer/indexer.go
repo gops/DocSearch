@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
@@ -44,6 +45,32 @@ type SearchResult struct {
 	TotalHits  int                `json:"total_hits"`
 	DurationMs int64              `json:"duration_ms"`
 	Items      []SearchResultItem `json:"items"`
+}
+
+// DuplicateFile represents an individual file in a duplicate group.
+type DuplicateFile struct {
+	Path      string    `json:"path"`
+	Filename  string    `json:"filename"`
+	Extension string    `json:"extension"`
+	Size      int64     `json:"size"`
+	ModTime   time.Time `json:"mod_time"`
+}
+
+// DuplicateGroup represents a cluster of identical files sharing the exact same content hash.
+type DuplicateGroup struct {
+	Hash        string          `json:"hash"`
+	Size        int64           `json:"size"`
+	WastedBytes int64           `json:"wasted_bytes"`
+	Count       int             `json:"count"`
+	Files       []DuplicateFile `json:"files"`
+}
+
+// DuplicateReport summarizes all duplicate groups found in the index.
+type DuplicateReport struct {
+	TotalGroups      int              `json:"total_groups"`
+	TotalDuplicates  int              `json:"total_duplicates"`
+	TotalWastedBytes int64           `json:"total_wasted_bytes"`
+	Groups           []DuplicateGroup `json:"groups"`
 }
 
 // Indexer manages the Bluge index writer, reader, and searches.
@@ -100,6 +127,7 @@ func (idx *Indexer) IndexDocument(doc *Document) error {
 		AddField(bluge.NewTextField("filename", doc.Filename).StoreValue().HighlightMatches()).
 		AddField(bluge.NewKeywordField("ext", doc.Extension).StoreValue()).
 		AddField(bluge.NewNumericField("size", float64(doc.Size)).StoreValue()).
+		AddField(bluge.NewKeywordField("size_bytes", strconv.FormatInt(doc.Size, 10)).StoreValue()).
 		AddField(bluge.NewDateTimeField("mod_time", doc.ModTime).StoreValue()).
 		AddField(bluge.NewKeywordField("hash", doc.Hash).StoreValue()).
 		AddField(bluge.NewKeywordField("is_ocr", strconv.FormatBool(doc.IsOCR)).StoreValue()).
@@ -219,6 +247,8 @@ func (idx *Indexer) Search(queryStr string, limit int) (*SearchResult, error) {
 				item.Extension = val
 			case "size":
 				rawSizeStr = val
+			case "size_bytes":
+				rawSizeStr = val
 			case "mod_time":
 				rawModTimeStr = val
 			case "is_ocr":
@@ -296,4 +326,117 @@ func (idx *Indexer) DocCount() (uint64, error) {
 	defer reader.Close()
 
 	return reader.Count()
+}
+
+// FindDuplicates scans all indexed documents and groups identical files by content hash.
+func (idx *Indexer) FindDuplicates() (*DuplicateReport, error) {
+	idx.mu.RLock()
+	defer idx.mu.RUnlock()
+
+	if idx.writer == nil {
+		return nil, fmt.Errorf("indexer is closed")
+	}
+
+	reader, err := idx.writer.Reader()
+	if err != nil {
+		return nil, fmt.Errorf("failed to acquire reader: %w", err)
+	}
+	defer reader.Close()
+
+	// Query all indexed documents
+	q := bluge.NewMatchAllQuery()
+	req := bluge.NewAllMatches(q)
+
+	dmi, err := reader.Search(context.Background(), req)
+	if err != nil {
+		return nil, fmt.Errorf("duplicate search failed: %w", err)
+	}
+
+	hashMap := make(map[string][]DuplicateFile)
+
+	hit, err := dmi.Next()
+	for err == nil && hit != nil {
+		var path, filename, ext, hash, sizeStr, modTimeStr string
+
+		_ = hit.VisitStoredFields(func(field string, value []byte) bool {
+			val := string(value)
+			switch field {
+			case "path":
+				path = val
+			case "filename":
+				filename = val
+			case "ext":
+				ext = val
+			case "hash":
+				hash = val
+			case "size":
+				sizeStr = val
+			case "size_bytes":
+				sizeStr = val
+			case "mod_time":
+				modTimeStr = val
+			}
+			return true
+		})
+
+		if hash != "" && path != "" {
+			var size int64
+			if s, err := strconv.ParseFloat(sizeStr, 64); err == nil {
+				size = int64(s)
+			}
+			var modTime time.Time
+			if t, err := time.Parse(time.RFC3339Nano, modTimeStr); err == nil {
+				modTime = t
+			}
+
+			df := DuplicateFile{
+				Path:      path,
+				Filename:  filename,
+				Extension: ext,
+				Size:      size,
+				ModTime:   modTime,
+			}
+			hashMap[hash] = append(hashMap[hash], df)
+		}
+
+		hit, err = dmi.Next()
+	}
+
+	var groups []DuplicateGroup
+	var totalDuplicates int
+	var totalWastedBytes int64
+
+	for hash, files := range hashMap {
+		if len(files) > 1 {
+			fileSize := files[0].Size
+			redundantCount := len(files) - 1
+			wasted := int64(redundantCount) * fileSize
+
+			totalDuplicates += redundantCount
+			totalWastedBytes += wasted
+
+			groups = append(groups, DuplicateGroup{
+				Hash:        hash,
+				Size:        fileSize,
+				WastedBytes: wasted,
+				Count:       len(files),
+				Files:       files,
+			})
+		}
+	}
+
+	// Sort groups by wasted bytes descending (highest wasted disk space first)
+	sort.Slice(groups, func(i, j int) bool {
+		if groups[i].WastedBytes == groups[j].WastedBytes {
+			return groups[i].Count > groups[j].Count
+		}
+		return groups[i].WastedBytes > groups[j].WastedBytes
+	})
+
+	return &DuplicateReport{
+		TotalGroups:      len(groups),
+		TotalDuplicates:  totalDuplicates,
+		TotalWastedBytes: totalWastedBytes,
+		Groups:           groups,
+	}, nil
 }

@@ -19,6 +19,7 @@ DocSearch indexes your local documents, PDFs, Word files, code, and scanned imag
 ## Key Features
 
 - **Selective Folder Indexing:** Only scans and monitors folders you explicitly select. Does not index your entire drive or slow down your system.
+- **Duplicate Document Detection:** Cryptographic SHA-256 content hashing instantly finds duplicate documents across all monitored directories, calculates wasted disk space, and lets you open or remove redundant copies via CLI and UI.
 - **System Tray Daemon:** Sits in your OS system tray (Windows notification area, macOS menu bar, Linux indicator) with quick access to search, folder re-scans, and update checks.
 - **Self-Updating via GitHub Releases:** Checks for latest binary releases from GitHub, verifies SHA-256 checksums, and applies atomic in-place updates.
 - **Pure Go Search Core:** Powered by [Bluge](https://github.com/blugelabs/bluge) for embedded, high-performance BM25 full-text indexing, prefix matching, and hit highlights.
@@ -95,7 +96,13 @@ You can also run instant terminal searches without opening the UI:
 ./docsearch search "cross platform"
 ```
 
-### 5. Check and Apply Updates
+### 5. Find Duplicate Files
+Scan all indexed directories for duplicate documents and wasted disk space:
+```bash
+./docsearch duplicates
+```
+
+### 6. Check and Apply Updates
 ```bash
 # Check if a new version is available on GitHub
 ./docsearch check-update

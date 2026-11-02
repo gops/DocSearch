@@ -50,6 +50,7 @@ func (t *Tray) onReady() {
 	systray.SetTooltip("DocSearch — Local Document Indexer")
 
 	mSearch := systray.AddMenuItem("🔍 Open Search UI", "Open search in default browser")
+	mDuplicates := systray.AddMenuItem("📑 Find Duplicates", "View and manage duplicate documents")
 	mRescan := systray.AddMenuItem("🔄 Rescan Folders", "Scan and index configured folders")
 	mUpdate := systray.AddMenuItem("⚡ Check for Updates...", "Check GitHub Releases for new version")
 
@@ -76,6 +77,9 @@ func (t *Tray) onReady() {
 			select {
 			case <-mSearch.ClickedCh:
 				OpenBrowser(uiURL)
+
+			case <-mDuplicates.ClickedCh:
+				OpenBrowser(uiURL + "#duplicates")
 
 			case <-mRescan.ClickedCh:
 				log.Println("[Tray] Rescan requested from tray menu.")

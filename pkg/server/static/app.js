@@ -10,7 +10,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const metricTotalDocs = document.getElementById("metric-total-docs");
   const btnToggleFolders = document.getElementById("btn-toggle-folders");
   const btnCheckUpdate = document.getElementById("btn-check-update");
+  const btnDuplicates = document.getElementById("btn-duplicates");
   const foldersDrawer = document.getElementById("folders-drawer");
+  const duplicatesDrawer = document.getElementById("duplicates-drawer");
+  const duplicatesContainer = document.getElementById("duplicates-container");
+  const duplicatesSummary = document.getElementById("duplicates-summary");
+  const btnRefreshDupes = document.getElementById("btn-refresh-dupes");
   const folderList = document.getElementById("folder-list");
   const folderCount = document.getElementById("folder-count");
   const newFolderInput = document.getElementById("new-folder-input");
@@ -51,8 +56,25 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Toggle Folders Drawer
   btnToggleFolders.addEventListener("click", () => {
+    duplicatesDrawer.classList.add("hidden");
     foldersDrawer.classList.toggle("hidden");
   });
+
+  // Toggle Duplicates Drawer
+  btnDuplicates.addEventListener("click", () => {
+    foldersDrawer.classList.add("hidden");
+    duplicatesDrawer.classList.toggle("hidden");
+    if (!duplicatesDrawer.classList.contains("hidden")) {
+      loadDuplicates();
+    }
+  });
+
+  btnRefreshDupes.addEventListener("click", loadDuplicates);
+
+  if (window.location.hash === "#duplicates") {
+    duplicatesDrawer.classList.remove("hidden");
+    loadDuplicates();
+  }
 
   // Check Updates
   btnCheckUpdate.addEventListener("click", async () => {
@@ -232,6 +254,92 @@ document.addEventListener("DOMContentLoaded", () => {
       loadFolders();
     } catch (e) {
       alert("Error removing folder: " + e.message);
+    }
+  };
+
+  async function loadDuplicates() {
+    duplicatesSummary.textContent = "Scanning...";
+    duplicatesContainer.innerHTML = `<p class="empty-sub">Analyzing index for duplicate files...</p>`;
+
+    try {
+      const res = await fetch("/api/duplicates");
+      if (!res.ok) throw new Error("Failed to scan duplicates");
+      const data = await res.json();
+
+      if (!data.groups || data.groups.length === 0) {
+        duplicatesSummary.textContent = "0 Duplicates";
+        duplicatesSummary.className = "badge";
+        duplicatesContainer.innerHTML = `
+          <div class="empty-state" style="padding: 24px 0;">
+            <p>✅ No duplicate documents found across your indexed folders.</p>
+          </div>
+        `;
+        return;
+      }
+
+      const wastedStr = formatBytes(data.total_wasted_bytes);
+      duplicatesSummary.textContent = `${data.total_duplicates} duplicates (${wastedStr} wasted)`;
+      duplicatesSummary.className = "badge badge-wasted";
+
+      duplicatesContainer.innerHTML = data.groups.map((group, idx) => {
+        const groupSize = formatBytes(group.size);
+        const groupWasted = formatBytes(group.wasted_bytes);
+        const hashShort = group.hash ? group.hash.substring(0, 10) + "..." : "";
+
+        const filesHtml = group.files.map((file) => `
+          <li class="dupe-file-item">
+            <div class="dupe-file-info">
+              <span class="dupe-file-name">${escapeHtml(file.filename)}</span>
+              <span class="dupe-file-path">${escapeHtml(file.path)}</span>
+            </div>
+            <div class="dupe-actions">
+              <button class="btn btn-secondary" style="padding: 3px 6px; font-size: 11px;" onclick="openFile('${escapeHtml(file.path)}')">Open</button>
+              <button class="btn btn-secondary" style="padding: 3px 6px; font-size: 11px;" onclick="openFolder('${escapeHtml(file.path)}')">Folder</button>
+              <button class="btn btn-danger" style="padding: 3px 6px; font-size: 11px;" onclick="deleteFile('${escapeHtml(file.path)}')">Delete</button>
+            </div>
+          </li>
+        `).join("");
+
+        return `
+          <div class="duplicate-group-card">
+            <div class="dupe-group-header">
+              <span><strong>Group #${idx + 1}</strong> (${group.count} copies) • Hash: ${hashShort}</span>
+              <div class="dupe-tags">
+                <span class="badge">Size: ${groupSize}</span>
+                <span class="badge badge-wasted">Wasted: ${groupWasted}</span>
+              </div>
+            </div>
+            <ul class="dupe-file-list">
+              ${filesHtml}
+            </ul>
+          </div>
+        `;
+      }).join("");
+    } catch (e) {
+      duplicatesContainer.innerHTML = `<p class="empty-sub" style="color: #ef4444;">Error loading duplicates: ${e.message}</p>`;
+    }
+  }
+
+  window.deleteFile = async function(filePath) {
+    if (!confirm(`Are you sure you want to permanently delete:\n"${filePath}"?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/file", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: filePath }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        loadDuplicates();
+        checkStatus();
+      } else {
+        alert(data.error || "Failed to delete file");
+      }
+    } catch (e) {
+      alert("Error deleting file: " + e.message);
     }
   };
 

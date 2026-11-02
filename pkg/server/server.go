@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -65,6 +66,8 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/open", s.handleOpen)
 	mux.HandleFunc("/api/update/check", s.handleUpdateCheck)
 	mux.HandleFunc("/api/update/apply", s.handleUpdateApply)
+	mux.HandleFunc("/api/duplicates", s.handleDuplicates)
+	mux.HandleFunc("/api/file", s.handleDeleteFile)
 
 	addr := fmt.Sprintf("127.0.0.1:%d", s.port)
 	log.Printf("[Server] DocSearch UI active at http://%s\n", addr)
@@ -280,4 +283,45 @@ func (s *Server) handleUpdateApply(w http.ResponseWriter, r *http.Request) {
 		"success": true,
 		"message": fmt.Sprintf("Successfully updated to %s. Please restart DocSearch.", rel.TagName),
 	})
+}
+
+func (s *Server) handleDuplicates(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	report, err := s.idx.FindDuplicates()
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error": %q}`, err.Error()), http.StatusInternalServerError)
+		return
+	}
+	_ = json.NewEncoder(w).Encode(report)
+}
+
+func (s *Server) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+
+	var req struct {
+		Path string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Path == "" {
+		http.Error(w, `{"error": "invalid path"}`, http.StatusBadRequest)
+		return
+	}
+
+	if _, err := os.Stat(req.Path); err != nil {
+		http.Error(w, `{"error": "file not found"}`, http.StatusNotFound)
+		return
+	}
+
+	if err := os.Remove(req.Path); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error": %q}`, err.Error()), http.StatusInternalServerError)
+		return
+	}
+
+	_ = s.idx.DeleteDocument(req.Path)
+
+	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
 }
