@@ -39,6 +39,30 @@ archives:
       - LICENSE
       - README.md
 
+nfpms:
+  - id: docsearch-packages
+    package_name: docsearch
+    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    builds:
+      - docsearch
+    formats:
+      - deb
+      - rpm
+    bindir: /usr/bin
+    maintainer: "DocSearch Contributors <https://github.com/gops/DocSearch>"
+    description: "Local cross-platform document search with OCR and system tray"
+    homepage: "https://github.com/gops/DocSearch"
+    license: "MIT"
+    section: "utils"
+    priority: "optional"
+    contents:
+      - src: assets/docsearch.desktop
+        dst: /usr/share/applications/docsearch.desktop
+      - src: pkg/tray/icon.png
+        dst: /usr/share/icons/hicolor/32x32/apps/docsearch.png
+      - src: assets/docsearch.png
+        dst: /usr/share/icons/hicolor/256x256/apps/docsearch.png
+
 checksum:
   name_template: "checksums.txt"
   algorithm: sha256

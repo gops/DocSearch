@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=DocSearch
+GenericName=Document Search Engine
+Comment=Local Cross-Platform Document Search with OCR & System Tray
+Exec=docsearch
+Icon=docsearch
+Terminal=false
+Type=Application
+Categories=Utility;Filesystem;Office;
+Keywords=search;document;ocr;index;pdf;find;
+StartupNotify=false

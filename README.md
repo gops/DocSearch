@@ -60,7 +60,21 @@ DocSearch
 
 ---
 
-## Quick Start & Build
+## Installation for Linux Desktop (No Terminal Required)
+
+For graphical desktop users on Linux:
+
+1. Go to **[GitHub Releases](https://github.com/gops/DocSearch/releases)** and download the package for your distribution:
+   * **Ubuntu / Debian / Linux Mint / Pop!_OS**: Download `docsearch_<version>_linux_amd64.deb`
+   * **Fedora / RHEL / openSUSE**: Download `docsearch_<version>_linux_amd64.rpm`
+2. In your file manager, **double-click the downloaded `.deb` file**.
+3. Click the **Install** button in your App Center (or GDebi).
+4. Launch **DocSearch** directly from your application launcher or application menu.
+5. DocSearch will appear in your system tray and start running quietly.
+
+---
+
+## Quick Start & Build (CLI / Developers)
 
 ### 1. Build the Binary
 ```bash
