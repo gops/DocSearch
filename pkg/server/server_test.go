@@ -108,4 +108,13 @@ func TestServerAPI(t *testing.T) {
 	if err := json.Unmarshal(wDupes.Body.Bytes(), &dupeReport); err != nil {
 		t.Fatalf("Failed to parse duplicates JSON: %v", err)
 	}
+
+	// 5. Test /api/config
+	reqConfig := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	wConfig := httptest.NewRecorder()
+	srv.handleConfig(wConfig, reqConfig)
+
+	if wConfig.Code != http.StatusOK {
+		t.Fatalf("Expected 200 OK from /api/config, got %d", wConfig.Code)
+	}
 }

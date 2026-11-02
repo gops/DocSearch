@@ -22,6 +22,7 @@ type Config struct {
 	OCREnabled     bool     `json:"ocr_enabled"`
 	OCRCommand     string   `json:"ocr_command"`
 	GitHubRepo     string   `json:"github_repo"`
+	MaxFileSizeMB  int      `json:"max_file_size_mb"`
 }
 
 // DefaultConfigPath returns the canonical path for configuration file.
@@ -75,9 +76,10 @@ func DefaultConfig() *Config {
 			".git", "node_modules", ".cache", "vendor",
 			"target", "build", "dist", "tmp", ".svn",
 		},
-		OCREnabled: true,
-		OCRCommand: "tesseract",
-		GitHubRepo: "gops/DocSearch",
+		OCREnabled:    true,
+		OCRCommand:    "tesseract",
+		GitHubRepo:    "gops/DocSearch",
+		MaxFileSizeMB: 25,
 	}
 }
 
@@ -228,4 +230,36 @@ func (c *Config) IsExcludedDir(dirName string) bool {
 		}
 	}
 	return false
+}
+
+// GetMaxFileSizeBytes returns the maximum allowed file size in bytes.
+// If MaxFileSizeMB is <= 0, it returns 0 (meaning unlimited).
+func (c *Config) GetMaxFileSizeBytes() int64 {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.MaxFileSizeMB <= 0 {
+		return 0
+	}
+	return int64(c.MaxFileSizeMB) * 1024 * 1024
+}
+
+// IsFileTooLarge returns true if a file's byte size exceeds the configured maximum.
+func (c *Config) IsFileTooLarge(size int64) bool {
+	limit := c.GetMaxFileSizeBytes()
+	if limit <= 0 {
+		return false
+	}
+	return size > limit
+}
+
+// SetMaxFileSizeMB updates the max file size limit.
+func (c *Config) SetMaxFileSizeMB(mb int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if mb < 0 {
+		mb = 0
+	}
+	c.MaxFileSizeMB = mb
 }

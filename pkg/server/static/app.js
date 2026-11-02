@@ -21,6 +21,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const newFolderInput = document.getElementById("new-folder-input");
   const btnAddFolder = document.getElementById("btn-add-folder");
   const btnReindex = document.getElementById("btn-reindex");
+  const maxSizeInput = document.getElementById("max-size-input");
+  const btnSaveMaxSize = document.getElementById("btn-save-max-size");
   const statusPill = document.getElementById("status-pill");
   const statusText = document.getElementById("status-text");
   const ocrStatusTag = document.getElementById("ocr-status-tag");
@@ -138,6 +140,31 @@ document.addEventListener("DOMContentLoaded", () => {
       checkStatus();
     } catch (e) {
       console.error(e);
+    }
+  });
+
+  // Save Max File Size
+  btnSaveMaxSize.addEventListener("click", async () => {
+    const mb = parseInt(maxSizeInput.value);
+    if (isNaN(mb) || mb < 0) {
+      alert("Please enter a valid file size limit in MB (or 0 for unlimited).");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ max_file_size_mb: mb }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        alert(`Updated max file size limit to ${data.max_file_size_mb} MB. Click "Trigger Re-scan" to apply.`);
+      } else {
+        alert(data.error || "Failed to update max file size");
+      }
+    } catch (e) {
+      alert("Error saving settings: " + e.message);
     }
   });
 
@@ -357,6 +384,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       metricTotalDocs.textContent = `Total Documents: ${st.doc_count}`;
+      if (document.activeElement !== maxSizeInput && st.max_file_size_mb !== undefined) {
+        maxSizeInput.value = st.max_file_size_mb;
+      }
       ocrStatusTag.textContent = st.ocr_available ? "OCR Engine: Available" : "OCR Engine: Not Installed (Tesseract recommended)";
       if (st.ocr_available) {
         ocrStatusTag.style.color = "#10b981";

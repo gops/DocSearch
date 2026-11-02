@@ -132,6 +132,13 @@ func (c *Crawler) ScanAll() {
 			}
 
 			if c.cfg.IsAllowedExtension(filepath.Ext(path)) {
+				if dInfo, err := d.Info(); err == nil {
+					if c.cfg.IsFileTooLarge(dInfo.Size()) {
+						log.Printf("[Crawler] Skipping large file (%d MB > %d MB): %s\n",
+							dInfo.Size()/(1024*1024), c.cfg.MaxFileSizeMB, path)
+						return nil
+					}
+				}
 				allFiles = append(allFiles, path)
 			}
 			return nil
@@ -178,6 +185,12 @@ func (c *Crawler) ScanAll() {
 func (c *Crawler) indexFile(filePath string) {
 	info, err := os.Stat(filePath)
 	if err != nil {
+		return
+	}
+
+	if c.cfg.IsFileTooLarge(info.Size()) {
+		log.Printf("[Crawler] Skipping large file (%d MB > %d MB): %s\n",
+			info.Size()/(1024*1024), c.cfg.MaxFileSizeMB, filePath)
 		return
 	}
 

@@ -40,6 +40,18 @@
         <button id="btn-add-folder" class="btn btn-primary">+ Add Folder</button>
       </div>
       <ul id="folder-list" class="folder-list"></ul>
+      
+      <div class="settings-row" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg-card); border-radius: 8px;">
+        <div>
+          <span style="font-weight: 600; font-size: 13px;">Skip Large Files (> MB)</span>
+          <div style="font-size: 11px; color: var(--text-dim);">Files exceeding this size limit will not be crawled</div>
+        </div>
+        <div style="display: flex; gap: 6px; align-items: center;">
+          <input type="number" id="max-size-input" min="1" max="10000" style="width: 70px; padding: 6px; background: var(--bg-primary); border: 1px solid var(--border-color); color: var(--text-main); border-radius: 6px; font-size: 13px;" />
+          <button id="btn-save-max-size" class="btn btn-secondary" style="padding: 6px 10px;">Save</button>
+        </div>
+      </div>
+
       <div class="drawer-footer">
         <button id="btn-reindex" class="btn btn-warning">🔄 Trigger Re-scan</button>
       </div>

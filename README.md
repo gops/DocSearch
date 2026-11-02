@@ -19,6 +19,7 @@ DocSearch indexes your local documents, PDFs, Word files, code, and scanned imag
 ## Key Features
 
 - **Selective Folder Indexing:** Only scans and monitors folders you explicitly select. Does not index your entire drive or slow down your system.
+- **Large File Protection:** Automatically skips files exceeding the configured size limit (defaults to 25 MB, customizable via CLI, UI, or config; set to 0 for unlimited) to prevent memory spikes.
 - **Duplicate Document Detection:** Cryptographic SHA-256 content hashing instantly finds duplicate documents across all monitored directories, calculates wasted disk space, and lets you open or remove redundant copies via CLI and UI.
 - **System Tray Daemon:** Sits in your OS system tray (Windows notification area, macOS menu bar, Linux indicator) with quick access to search, folder re-scans, and update checks.
 - **Self-Updating via GitHub Releases:** Checks for latest binary releases from GitHub, verifies SHA-256 checksums, and applies atomic in-place updates.
@@ -157,6 +158,7 @@ DocSearch stores its configuration in `~/.config/docsearch/config.json` (or `./d
   ],
   "index_path": "~/.local/share/docsearch/bluge_index",
   "server_port": 9876,
+  "max_file_size_mb": 25,
   "ocr_enabled": true,
   "ocr_command": "tesseract",
   "github_repo": "gops/DocSearch",

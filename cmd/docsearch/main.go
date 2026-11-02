@@ -62,6 +62,7 @@ func main() {
 	configPath := flag.String("config", "", "Path to custom config JSON file")
 	portFlag := flag.Int("port", 0, "Override HTTP server port")
 	headlessFlag := flag.Bool("headless", false, "Run in background without system tray icon")
+	maxSizeFlag := flag.Int("max-size-mb", 0, "Skip files larger than this size in megabytes (default 25)")
 	flag.Parse()
 
 	fmt.Print(Banner)
@@ -75,8 +76,12 @@ func main() {
 	if *portFlag > 0 {
 		cfg.ServerPort = *portFlag
 	}
+	if *maxSizeFlag > 0 {
+		cfg.SetMaxFileSizeMB(*maxSizeFlag)
+	}
 
 	log.Printf("[Init] Using index path: %s\n", cfg.IndexPath)
+	log.Printf("[Init] Max file size limit: %d MB\n", cfg.MaxFileSizeMB)
 	log.Printf("[Init] Configured folders to index: %v\n", cfg.GetFolders())
 
 	// Initialize Bluge Indexer
@@ -208,11 +213,17 @@ func handleCLIList() {
 		fmt.Printf("  [%d] %s\n", i+1, f)
 	}
 
+	maxSizeStr := fmt.Sprintf("%d MB", cfg.MaxFileSizeMB)
+	if cfg.MaxFileSizeMB <= 0 {
+		maxSizeStr = "Unlimited (0 MB)"
+	}
+	fmt.Printf("\nMax File Size Limit: %s (larger files are skipped)\n", maxSizeStr)
+
 	idx, err := indexer.Open(cfg.IndexPath)
 	if err == nil {
 		defer idx.Close()
 		count, _ := idx.DocCount()
-		fmt.Printf("\nTotal Indexed Documents: %d\n\n", count)
+		fmt.Printf("Total Indexed Documents: %d\n\n", count)
 	}
 }
 

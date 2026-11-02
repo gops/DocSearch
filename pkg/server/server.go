@@ -68,6 +68,7 @@ func (s *Server) Start() error {
 	mux.HandleFunc("/api/update/apply", s.handleUpdateApply)
 	mux.HandleFunc("/api/duplicates", s.handleDuplicates)
 	mux.HandleFunc("/api/file", s.handleDeleteFile)
+	mux.HandleFunc("/api/config", s.handleConfig)
 
 	addr := fmt.Sprintf("127.0.0.1:%d", s.port)
 	log.Printf("[Server] DocSearch UI active at http://%s\n", addr)
@@ -173,12 +174,13 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	ocrAvail := extractor.IsOCRAvailable(s.cfg.OCRCommand)
 
 	resp := map[string]interface{}{
-		"is_indexing":    crawlerStatus.IsIndexing,
-		"indexed_count":  crawlerStatus.IndexedCount,
-		"total_files":    crawlerStatus.TotalFiles,
-		"doc_count":      docCount,
-		"ocr_available":  ocrAvail,
-		"indexed_folders": s.cfg.GetFolders(),
+		"is_indexing":       crawlerStatus.IsIndexing,
+		"indexed_count":     crawlerStatus.IndexedCount,
+		"total_files":       crawlerStatus.TotalFiles,
+		"doc_count":         docCount,
+		"ocr_available":     ocrAvail,
+		"max_file_size_mb":  s.cfg.MaxFileSizeMB,
+		"indexed_folders":   s.cfg.GetFolders(),
 	}
 
 	_ = json.NewEncoder(w).Encode(resp)
@@ -324,4 +326,42 @@ func (s *Server) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
 	_ = s.idx.DeleteDocument(req.Path)
 
 	_ = json.NewEncoder(w).Encode(map[string]bool{"success": true})
+}
+
+func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	switch r.Method {
+	case http.MethodGet:
+		resp := map[string]interface{}{
+			"max_file_size_mb": s.cfg.MaxFileSizeMB,
+			"indexed_folders":  s.cfg.GetFolders(),
+			"ocr_enabled":      s.cfg.OCREnabled,
+			"ocr_command":      s.cfg.OCRCommand,
+			"server_port":      s.cfg.ServerPort,
+		}
+		_ = json.NewEncoder(w).Encode(resp)
+
+	case http.MethodPost:
+		var req struct {
+			MaxFileSizeMB *int `json:"max_file_size_mb"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, `{"error": "invalid request"}`, http.StatusBadRequest)
+			return
+		}
+
+		if req.MaxFileSizeMB != nil {
+			s.cfg.SetMaxFileSizeMB(*req.MaxFileSizeMB)
+			_ = s.cfg.Save()
+		}
+
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"success":          true,
+			"max_file_size_mb": s.cfg.MaxFileSizeMB,
+		})
+
+	default:
+		http.Error(w, `{"error": "method not allowed"}`, http.StatusMethodNotAllowed)
+	}
 }
