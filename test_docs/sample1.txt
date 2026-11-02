@@ -1,0 +1,1 @@
+DocSearch is an open source fast local indexing tool with Bluge and instant search.

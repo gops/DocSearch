@@ -1,0 +1,20 @@
+# Root Binary
+/docsearch
+/docsearch.exe
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test and temporary data
+data/
+dist/
+*.tmp
+*.log
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.swp
