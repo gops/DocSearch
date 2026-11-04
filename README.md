@@ -68,7 +68,7 @@ Configure the official DocSearch APT repository to receive automated updates alo
 
 ```bash
 # 1. Register DocSearch APT source
-echo "deb [trusted=yes] https://gops.github.io/DocSearch/ ./" | sudo tee /etc/apt/sources.list.d/docsearch.list
+echo "deb [trusted=yes] https://iam.patelgopal.com/DocSearch/ ./" | sudo tee /etc/apt/sources.list.d/docsearch.list
 
 # 2. Update and install
 sudo apt update
