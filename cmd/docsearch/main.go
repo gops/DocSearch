@@ -8,12 +8,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"docsearch/frontend"
 	"docsearch/pkg/config"
 	"docsearch/pkg/crawler"
-	"docsearch/pkg/desktop"
 	"docsearch/pkg/extractor"
 	"docsearch/pkg/indexer"
+	"docsearch/pkg/server"
 	"docsearch/pkg/tray"
 	"docsearch/pkg/updater"
 )
@@ -64,6 +63,7 @@ func main() {
 	portFlag := flag.Int("port", 0, "Override HTTP server port")
 	headlessFlag := flag.Bool("headless", false, "Run in background without system tray icon")
 	maxSizeFlag := flag.Int("max-size-mb", 0, "Skip files larger than this size in megabytes (default 25)")
+	openFlag := flag.Bool("open", false, "Open search interface in default browser on startup")
 	flag.Parse()
 
 	fmt.Print(Banner)
@@ -110,29 +110,33 @@ func main() {
 	// Start crawler
 	c.Start()
 
-	// Initialize Native Desktop Application (Wails)
-	desktopApp := desktop.NewApp(cfg, idx, c, Version)
+	// Start Web UI Server
+	srv := server.NewServer(cfg, idx, c, Version)
+	go func() {
+		if err := srv.Start(); err != nil {
+			log.Fatalf("[Server] HTTP server error: %v\n", err)
+		}
+	}()
+
+	if *openFlag {
+		tray.OpenBrowser(fmt.Sprintf("http://127.0.0.1:%d", cfg.ServerPort))
+	}
 
 	// Cleanup callback
 	cleanup := func() {
 		log.Println("\n[Shutdown] Shutting down DocSearch...")
-		desktopApp.Quit()
 		c.Stop()
 		_ = idx.Close()
 		os.Exit(0)
 	}
 
-	// Determine if native desktop window and system tray should be enabled
-	useDesktop := !*headlessFlag && tray.HasDisplayEnvironment()
+	// Determine if system tray should be enabled
+	useTray := !*headlessFlag && tray.HasDisplayEnvironment()
 
-	if useDesktop {
-		log.Println("[Init] System tray and native desktop window active.")
-		t := tray.New(cfg, idx, c, Version, cleanup, desktopApp.Show)
-		go t.Run()
-
-		if err := desktop.Run(desktopApp, frontend.Assets); err != nil {
-			log.Fatalf("[Init] Desktop window error: %v\n", err)
-		}
+	if useTray {
+		log.Println("[Init] System tray active. DocSearch is accessible from your system tray.")
+		t := tray.New(cfg, idx, c, Version, cleanup)
+		t.Run() // Blocks main thread
 	} else {
 		log.Println("[Init] Running in headless mode. Press Ctrl+C to stop.")
 		sigChan := make(chan os.Signal, 1)

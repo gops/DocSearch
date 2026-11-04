@@ -45,19 +45,21 @@ func (t *Tray) onReady() {
 		}
 	}()
 
+	port := t.cfg.ServerPort
+	if port <= 0 {
+		port = 9876
+	}
+	uiURL := fmt.Sprintf("http://127.0.0.1:%d", port)
+
 	// Event handling loop
 	go func() {
 		for {
 			select {
 			case <-mSearch.ClickedCh:
-				if t.onOpenWindow != nil {
-					t.onOpenWindow()
-				}
+				OpenBrowser(uiURL)
 
 			case <-mDuplicates.ClickedCh:
-				if t.onOpenWindow != nil {
-					t.onOpenWindow()
-				}
+				OpenBrowser(uiURL + "#duplicates")
 
 			case <-mRescan.ClickedCh:
 				log.Println("[Tray] Rescan requested from tray menu.")
