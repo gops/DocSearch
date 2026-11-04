@@ -61,7 +61,25 @@ DocSearch
 
 ---
 
-## Installation for Linux Desktop (No Terminal Required)
+## Installation on Linux (Ubuntu / Debian / Linux Mint / Pop!_OS)
+
+### Option A: Install via APT Repository (Auto-Updates with `apt upgrade`)
+Configure the official DocSearch APT repository to receive automated updates alongside your system packages:
+
+```bash
+# 1. Register DocSearch APT source
+echo "deb [trusted=yes] https://gops.github.io/DocSearch/ ./" | sudo tee /etc/apt/sources.list.d/docsearch.list
+
+# 2. Update and install
+sudo apt update
+sudo apt install docsearch
+```
+
+Any future `sudo apt update && sudo apt upgrade` will automatically update DocSearch!
+
+---
+
+### Option B: Download .deb / .rpm (No Terminal Required)
 
 For graphical desktop users on Linux:
 
