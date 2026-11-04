@@ -1,0 +1,20 @@
+Architectures: amd64 arm64
+Codename: stable
+Components: main
+Date: Wed, 04 Nov 2026 13:57:46 +0000
+Description: DocSearch APT Repository
+Label: DocSearch
+Origin: DocSearch
+Suite: stable
+MD5Sum:
+ d33fa90a3c9b0664e1c98e5af74379c1             1040 Packages
+ b0bfb6226d4c250a0e2ea1ffebd6b689              504 Packages.gz
+SHA1:
+ b08adf9ee70504d5afb4939a5b395eb9e3d5893a             1040 Packages
+ 4020aa1905463dc22dcf17cd8f04d1300d996f8f              504 Packages.gz
+SHA256:
+ 112a7e801ede173aa3b6af82f67cad851df27fbf3d1d19da6217490ce9374f7c             1040 Packages
+ 7c22ac969ee9a47072a22a72b969c67575e5abf189ca7e8c6163ec19808a3a6b              504 Packages.gz
+SHA512:
+ 1b5ad539dfe008e47c61e968818be2ebce4be04999f611f03994fb5c070e6147f6d24d8722f23dfd57588797bb7ed59917f405338ab98a4fdb25f47b85ded28d             1040 Packages
+ fd2e94525e88be91108b9c7decea3216f9dadca85c8d0fa74d0e0b3363f4db31eeffc80bda81b5d602a172f8074d0ec50cacaf3479418e85ee6a45e54f570b48              504 Packages.gz

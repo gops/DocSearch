@@ -1,0 +1,30 @@
+Package: docsearch
+Version: 0.1.5
+Architecture: amd64
+Maintainer: DocSearch Contributors <https://github.com/gops/DocSearch>
+Installed-Size: 12383
+Filename: ./docsearch_0.1.5_linux_amd64.deb
+Size: 5184212
+MD5sum: 99efa4e541e999c731512eb10a7bd429
+SHA1: 21c7e8879f5736cd7db5887cf67e59a5d76710ff
+SHA256: 8db781c8b7c5f90751109acbd6b3da4911f13fdc54555e394ea11258c04a2f46
+Section: utils
+Priority: optional
+Homepage: https://github.com/gops/DocSearch
+Description: Local cross-platform document search with OCR and system tray
+
+Package: docsearch
+Version: 0.1.5
+Architecture: arm64
+Maintainer: DocSearch Contributors <https://github.com/gops/DocSearch>
+Installed-Size: 11523
+Filename: ./docsearch_0.1.5_linux_arm64.deb
+Size: 4676312
+MD5sum: e3c903b091091bc36c2e90b3435cfea0
+SHA1: 3473094d5a809ecb36bb609b03a4be579b03ab40
+SHA256: 3582e60f44eba2b9a042fa520db5be64c2a7e80e0ba9f72687f87482e2840c5a
+Section: utils
+Priority: optional
+Homepage: https://github.com/gops/DocSearch
+Description: Local cross-platform document search with OCR and system tray
+

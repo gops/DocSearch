@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DocSearch APT Repository</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --card-bg: #181b24;
+      --border: #2a2e3d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #3b82f6;
+      --code-bg: #090d16;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      max-width: 680px;
+      width: 100%;
+      padding: 32px;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+    }
+    h1 {
+      margin-top: 0;
+      font-size: 1.8rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    p {
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 18px;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.9rem;
+      color: #7dd3fc;
+    }
+    .step {
+      margin-bottom: 24px;
+    }
+    .step-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    .footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border);
+      font-size: 0.85rem;
+      text-align: center;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔍 DocSearch APT Repository</h1>
+    <p>Official Debian / Ubuntu / Linux Mint APT repository for <strong>DocSearch</strong> — local cross-platform document search engine with OCR and system tray.</p>
+
+    <div class="step">
+      <div class="step-title">1. Add the DocSearch APT source:</div>
+      <pre>echo "deb [trusted=yes] https://gops.github.io/DocSearch/ ./" | sudo tee /etc/apt/sources.list.d/docsearch.list</pre>
+    </div>
+
+    <div class="step">
+      <div class="step-title">2. Update package lists and install DocSearch:</div>
+      <pre>sudo apt update
+sudo apt install docsearch</pre>
+    </div>
+
+    <div class="step">
+      <div class="step-title">3. Automatic Upgrades:</div>
+      <p>From now on, standard <code>sudo apt update && sudo apt upgrade</code> will automatically update DocSearch whenever new versions are released.</p>
+    </div>
+
+    <div class="footer">
+      <a href="https://github.com/gops/DocSearch" target="_blank" rel="noopener">GitHub Repository</a> • MIT License
+    </div>
+  </div>
+</body>
+</html>
