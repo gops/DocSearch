@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   build-and-release:
+    name: Build & Release
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -52,16 +53,14 @@ jobs:
           cp assets/docsearch.desktop "$DEB_DIR/usr/share/applications/"
           cp assets/docsearch.png "$DEB_DIR/usr/share/icons/hicolor/256x256/apps/"
 
-          cat << EOF > "$DEB_DIR/DEBIAN/control"
-Package: docsearch
-Version: $VERSION
-Section: utils
-Priority: optional
-Architecture: amd64
-Maintainer: DocSearch Contributors <https://github.com/gops/DocSearch>
-Description: Local cross-platform document search with native Slint GUI and Tantivy
-Homepage: https://github.com/gops/DocSearch
-EOF
+          echo "Package: docsearch" > "$DEB_DIR/DEBIAN/control"
+          echo "Version: $VERSION" >> "$DEB_DIR/DEBIAN/control"
+          echo "Section: utils" >> "$DEB_DIR/DEBIAN/control"
+          echo "Priority: optional" >> "$DEB_DIR/DEBIAN/control"
+          echo "Architecture: amd64" >> "$DEB_DIR/DEBIAN/control"
+          echo "Maintainer: DocSearch Contributors <https://github.com/gops/DocSearch>" >> "$DEB_DIR/DEBIAN/control"
+          echo "Description: Local cross-platform document search with native Slint GUI and Tantivy" >> "$DEB_DIR/DEBIAN/control"
+          echo "Homepage: https://github.com/gops/DocSearch" >> "$DEB_DIR/DEBIAN/control"
 
           dpkg-deb --build "$DEB_DIR" "dist/docsearch_${VERSION}_linux_amd64.deb"
 
