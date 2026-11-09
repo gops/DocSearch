@@ -18,7 +18,7 @@ use slint::{ComponentHandle, ModelRc, VecModel};
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
-const VERSION: &str = "0.2.0";
+const VERSION: &str = "0.2.1";
 const BANNER: &str = r#"
   ___             ____                      _     
  |   \  ___  __  / ___|  ___  __ _ _ _ __ _| |_   
@@ -66,6 +66,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     format!("{} MB", cfg.max_file_size_mb)
                 };
                 println!("\nMax File Size Limit: {} (larger files skipped)", max_str);
+                println!("Indexing Pacing Delay: {} ms / file (gentle low I/O & CPU mode)", cfg.indexing_delay_ms);
 
                 if let Ok(idx) = Indexer::open(&cfg.index_path) {
                     println!("Total Indexed Documents: {}\n", idx.doc_count());
@@ -371,6 +372,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     });
 
+    // Handle window close request: minimize to system tray instead of closing
+    main_window.window().on_close_requested(|| {
+        eprintln!("[GUI] Window close requested: minimizing to system tray.");
+        slint::CloseRequestResponse::HideWindow
+    });
+
     // Tray Listener Thread: Handles tray clicks
     let win_tray = window_weak.clone();
     let crawler_tray = crawler.clone();
@@ -383,6 +390,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         move || {
                             if let Some(w) = win.upgrade() {
                                 let _ = w.show();
+                                w.window().set_minimized(false);
                             }
                         }
                     });
@@ -392,13 +400,16 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     std::thread::spawn(move || c.scan_all());
                 }
                 tray::TrayAction::Quit => {
+                    eprintln!("[Shutdown] Quit requested from system tray. Terminating DocSearch...");
                     std::process::exit(0);
                 }
             }
         }
     });
 
-    main_window.run()?;
+    // Show window initially and run event loop until explicit quit from system tray
+    main_window.show()?;
+    slint::run_event_loop_until_quit()?;
     Ok(())
 }
 

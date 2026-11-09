@@ -29,4 +29,5 @@ fn test_config_defaults_and_serialization() {
     let loaded = Config::load(Some(config_file.to_str().unwrap())).expect("Failed to load config");
     assert_eq!(loaded.indexed_folders.len(), 1);
     assert_eq!(loaded.max_file_size_mb, 25);
+    assert_eq!(loaded.indexing_delay_ms, 25);
 }

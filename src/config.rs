@@ -16,6 +16,8 @@ pub struct Config {
     pub ocr_enabled: bool,
     #[serde(default = "default_ocr_command")]
     pub ocr_command: String,
+    #[serde(default = "default_indexing_delay_ms")]
+    pub indexing_delay_ms: u64,
     #[serde(default = "default_github_repo")]
     pub github_repo: String,
     #[serde(default = "default_file_extensions")]
@@ -52,6 +54,10 @@ fn default_ocr_command() -> String {
     "tesseract".to_string()
 }
 
+fn default_indexing_delay_ms() -> u64 {
+    25
+}
+
 fn default_github_repo() -> String {
     "gops/DocSearch".to_string()
 }
@@ -82,6 +88,7 @@ impl Default for Config {
             max_file_size_mb: default_max_file_size_mb(),
             ocr_enabled: default_true(),
             ocr_command: default_ocr_command(),
+            indexing_delay_ms: default_indexing_delay_ms(),
             github_repo: default_github_repo(),
             file_extensions: default_file_extensions(),
             excluded_dirs: default_excluded_dirs(),

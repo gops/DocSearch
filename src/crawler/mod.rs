@@ -123,11 +123,40 @@ impl Crawler {
 
         self.total_files.store(candidate_files.len(), Ordering::SeqCst);
         self.indexed_count.store(0, Ordering::SeqCst);
-        eprintln!("[Crawler] Discovered {} candidate files to index.", candidate_files.len());
+        eprintln!(
+            "[Crawler] Discovered {} candidate files. Indexing with gentle background pacing...",
+            candidate_files.len()
+        );
 
-        for path in candidate_files {
-            self.index_single_file(&path);
+        let mut indexed_in_batch = 0usize;
+        for path in &candidate_files {
+            let was_indexed = self.index_single_file(path);
             self.indexed_count.fetch_add(1, Ordering::Relaxed);
+
+            let delay_ms = {
+                let cfg = self.config.read().unwrap();
+                cfg.indexing_delay_ms
+            };
+
+            // Gentle sleep between files to prevent hard disk I/O and CPU spikes
+            if delay_ms > 0 {
+                let nap = if was_indexed {
+                    Duration::from_millis(delay_ms.saturating_mul(2))
+                } else {
+                    Duration::from_millis(delay_ms)
+                };
+                std::thread::sleep(nap);
+            }
+
+            if was_indexed {
+                indexed_in_batch += 1;
+                // Periodic batch commit every 25 newly indexed files to avoid heavy end-of-scan commit spikes
+                if indexed_in_batch >= 25 {
+                    indexed_in_batch = 0;
+                    let _ = self.indexer.commit();
+                    std::thread::sleep(Duration::from_millis(50));
+                }
+            }
         }
 
         let _ = self.indexer.commit();
@@ -140,22 +169,22 @@ impl Crawler {
         eprintln!("[Crawler] Scan completed. Total documents in index: {}", self.indexer.doc_count());
     }
 
-    pub fn index_single_file(&self, path: &Path) {
+    pub fn index_single_file(&self, path: &Path) -> bool {
         let meta = match fs::metadata(path) {
             Ok(m) => m,
-            Err(_) => return,
+            Err(_) => return false,
         };
 
         {
             let cfg = self.config.read().unwrap();
             if cfg.is_file_too_large(meta.len()) {
-                return;
+                return false;
             }
         }
 
         let hash = match calculate_file_hash(path) {
             Ok(h) => h,
-            Err(_) => return,
+            Err(_) => return false,
         };
 
         let path_str = path.to_string_lossy().to_string();
@@ -163,18 +192,18 @@ impl Crawler {
         // Check if unchanged
         if let Ok(Some(stored_hash)) = self.indexer.get_document_hash(&path_str) {
             if stored_hash == hash {
-                return; // Unchanged!
+                return false; // Unchanged!
             }
         }
 
         // Extract content
         let extracted = match self.extractor.extract(path) {
             Ok(res) => res,
-            Err(_) => return,
+            Err(_) => return false,
         };
 
         if extracted.content.trim().is_empty() {
-            return;
+            return false;
         }
 
         let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
@@ -186,7 +215,7 @@ impl Crawler {
             .map(|d| d.as_secs() as i64)
             .unwrap_or(0);
 
-        let _ = self.indexer.index_document(
+        let res = self.indexer.index_document(
             &path_str,
             &filename,
             &ext,
@@ -196,6 +225,8 @@ impl Crawler {
             extracted.is_ocr,
             &extracted.content,
         );
+
+        res.is_ok()
     }
 
     pub fn start_watcher(&self) {
@@ -241,6 +272,7 @@ impl Crawler {
             while let Ok(event) = rx.recv() {
                 match event.kind {
                     EventKind::Create(_) | EventKind::Modify(_) => {
+                        let mut has_changes = false;
                         for path in event.paths {
                             if path.is_file() {
                                 let ext = path
@@ -249,15 +281,34 @@ impl Crawler {
                                     .map(|s| format!(".{}", s))
                                     .unwrap_or_default();
 
-                                let allowed = {
+                                let (allowed, delay_ms) = {
                                     let cfg = config.read().unwrap();
-                                    cfg.is_allowed_extension(&ext)
+                                    (cfg.is_allowed_extension(&ext), cfg.indexing_delay_ms)
                                 };
 
                                 if allowed {
                                     let path_str = path.to_string_lossy().to_string();
                                     if let Ok(meta) = fs::metadata(&path) {
+                                        {
+                                            let cfg = config.read().unwrap();
+                                            if cfg.is_file_too_large(meta.len()) {
+                                                continue;
+                                            }
+                                        }
+
                                         if let Ok(hash) = calculate_file_hash(&path) {
+                                            // Check if unchanged
+                                            if let Ok(Some(stored_hash)) = indexer.get_document_hash(&path_str) {
+                                                if stored_hash == hash {
+                                                    continue;
+                                                }
+                                            }
+
+                                            // Gentle pacing pause before extraction
+                                            if delay_ms > 0 {
+                                                std::thread::sleep(Duration::from_millis(delay_ms));
+                                            }
+
                                             if let Ok(extracted) = extractor.extract(&path) {
                                                 if !extracted.content.trim().is_empty() {
                                                     let filename = path
@@ -282,7 +333,12 @@ impl Crawler {
                                                         extracted.is_ocr,
                                                         &extracted.content,
                                                     );
-                                                    let _ = indexer.commit();
+                                                    has_changes = true;
+
+                                                    // Post-index pause to avoid CPU/disk saturation
+                                                    if delay_ms > 0 {
+                                                        std::thread::sleep(Duration::from_millis(delay_ms));
+                                                    }
                                                 }
                                             }
                                         }
@@ -290,11 +346,18 @@ impl Crawler {
                                 }
                             }
                         }
+                        if has_changes {
+                            let _ = indexer.commit();
+                        }
                     }
                     EventKind::Remove(_) => {
+                        let mut has_changes = false;
                         for path in event.paths {
                             let path_str = path.to_string_lossy().to_string();
                             let _ = indexer.delete_document(&path_str);
+                            has_changes = true;
+                        }
+                        if has_changes {
                             let _ = indexer.commit();
                         }
                     }
@@ -327,6 +390,7 @@ pub fn calculate_file_hash<P: AsRef<Path>>(path: P) -> Result<String, std::io::E
     let mut reader = BufReader::new(file);
     let mut hasher = Sha256::new();
     let mut buffer = [0u8; 64 * 1024];
+    let mut bytes_since_yield = 0usize;
 
     loop {
         let count = reader.read(&mut buffer)?;
@@ -334,6 +398,12 @@ pub fn calculate_file_hash<P: AsRef<Path>>(path: P) -> Result<String, std::io::E
             break;
         }
         hasher.update(&buffer[..count]);
+        bytes_since_yield += count;
+        // Yield to OS every 1MB so reading large files does not monopolize CPU or saturate disk bandwidth
+        if bytes_since_yield >= 1024 * 1024 {
+            bytes_since_yield = 0;
+            std::thread::sleep(Duration::from_millis(5));
+        }
     }
 
     Ok(hex::encode(hasher.finalize()))
