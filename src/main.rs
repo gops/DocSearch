@@ -18,7 +18,7 @@ use slint::{ComponentHandle, ModelRc, VecModel};
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
-const VERSION: &str = "0.2.1";
+const VERSION: &str = "0.2.2";
 const BANNER: &str = r#"
   ___             ____                      _     
  |   \  ___  __  / ___|  ___  __ _ _ _ __ _| |_   

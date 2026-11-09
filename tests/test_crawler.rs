@@ -56,6 +56,29 @@ fn test_crawler_indexing_and_throttling() {
     assert_eq!(search_rust.total_hits, 1);
     assert_eq!(search_rust.items[0].filename, "test2.md");
 
+    // Search by path filter
+    let search_path = indexer.search("path:docs", 10).unwrap();
+    assert_eq!(search_path.total_hits, 3);
+
+    // Search by type filter
+    let search_md = indexer.search("type:markdown", 10).unwrap();
+    assert_eq!(search_md.total_hits, 1);
+    assert_eq!(search_md.items[0].filename, "test2.md");
+
+    // Search by size filter (>1MB)
+    let search_large = indexer.search("size:>1MB", 10).unwrap();
+    assert_eq!(search_large.total_hits, 1);
+    assert_eq!(search_large.items[0].filename, "test3.txt");
+
+    // Search by size filter (<1KB)
+    let search_small = indexer.search("size:<1KB", 10).unwrap();
+    assert_eq!(search_small.total_hits, 2);
+
+    // Search by filename filter
+    let search_name = indexer.search("name:test2", 10).unwrap();
+    assert_eq!(search_name.total_hits, 1);
+    assert_eq!(search_name.items[0].filename, "test2.md");
+
     // Second scan (all files unchanged)
     crawler.scan_all();
     assert_eq!(indexer.doc_count(), 3);

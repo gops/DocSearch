@@ -42,6 +42,44 @@ fn test_indexer_crud_and_search() {
     assert_eq!(search_slint.total_hits, 1);
     assert_eq!(search_slint.items[0].filename, "doc2.txt");
 
+    // Search by path keyword
+    let search_path = idx.search("path:test", 10).unwrap();
+    assert_eq!(search_path.total_hits, 2);
+
+    // Search by folder alias
+    let search_folder = idx.search("folder:test", 10).unwrap();
+    assert_eq!(search_folder.total_hits, 2);
+
+    // Search by name alias
+    let search_name = idx.search("name:doc1", 10).unwrap();
+    assert_eq!(search_name.total_hits, 1);
+    assert_eq!(search_name.items[0].filename, "doc1.txt");
+
+    // Search by type / ext
+    let search_type = idx.search("type:txt", 10).unwrap();
+    assert_eq!(search_type.total_hits, 2);
+
+    let search_ext = idx.search("ext:txt", 10).unwrap();
+    assert_eq!(search_ext.total_hits, 2);
+
+    // Search by size
+    let search_size_gt = idx.search("size:>150B", 10).unwrap();
+    assert_eq!(search_size_gt.total_hits, 1);
+    assert_eq!(search_size_gt.items[0].filename, "doc2.txt");
+
+    let search_size_lt = idx.search("size:<150B", 10).unwrap();
+    assert_eq!(search_size_lt.total_hits, 1);
+    assert_eq!(search_size_lt.items[0].filename, "doc1.txt");
+
+    let search_size_range = idx.search("size:50B..150B", 10).unwrap();
+    assert_eq!(search_size_range.total_hits, 1);
+    assert_eq!(search_size_range.items[0].filename, "doc1.txt");
+
+    // Combined search: path + type + size + content
+    let search_combined = idx.search("path:test type:txt size:<150B fox", 10).unwrap();
+    assert_eq!(search_combined.total_hits, 1);
+    assert_eq!(search_combined.items[0].filename, "doc1.txt");
+
     // Test hash lookup
     let hash = idx.get_document_hash("/test/doc1.txt").unwrap();
     assert_eq!(hash, Some("hash1".into()));
@@ -102,4 +140,34 @@ fn test_duplicate_detection() {
     assert_eq!(report.total_duplicates, 1);
     assert_eq!(report.total_wasted_bytes, 1024);
     assert_eq!(report.groups[0].files.len(), 2);
+}
+
+#[test]
+fn test_query_preprocessing() {
+    use docsearch::indexer::{parse_size_to_bytes, preprocess_query};
+
+    assert_eq!(parse_size_to_bytes("10MB"), Some(10 * 1024 * 1024));
+    assert_eq!(parse_size_to_bytes("500KB"), Some(500 * 1024));
+    assert_eq!(parse_size_to_bytes("1GB"), Some(1024 * 1024 * 1024));
+    assert_eq!(parse_size_to_bytes("100B"), Some(100));
+
+    assert_eq!(
+        preprocess_query("type:pdf size:>1MB path:Dropbox"),
+        "ext:pdf size:>1048576 path:Dropbox"
+    );
+
+    assert_eq!(
+        preprocess_query("folder:Projects file:main.rs"),
+        "path:Projects filename:main.rs"
+    );
+
+    assert_eq!(
+        preprocess_query("type:image screenshot size:small"),
+        "(ext:png OR ext:jpg OR ext:jpeg) screenshot size:[0 TO 102400]"
+    );
+
+    assert_eq!(
+        preprocess_query("size:1MB..5MB report"),
+        "size:[1048576 TO 5242880] report"
+    );
 }
