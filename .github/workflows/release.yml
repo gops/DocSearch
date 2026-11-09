@@ -65,6 +65,24 @@ jobs:
           echo "Description: Local cross-platform document search with native Slint GUI and Tantivy" >> "$DEB_DIR/DEBIAN/control"
           echo "Homepage: https://github.com/gops/DocSearch" >> "$DEB_DIR/DEBIAN/control"
 
+          # Add postinst script: auto-register APT repo so manual .deb installs receive apt updates
+          echo '#!/bin/sh' > "$DEB_DIR/DEBIAN/postinst"
+          echo 'set -e' >> "$DEB_DIR/DEBIAN/postinst"
+          echo 'if [ ! -f /etc/apt/sources.list.d/docsearch.list ]; then' >> "$DEB_DIR/DEBIAN/postinst"
+          echo '    echo "deb [trusted=yes] https://iam.patelgopal.com/DocSearch/ ./" > /etc/apt/sources.list.d/docsearch.list' >> "$DEB_DIR/DEBIAN/postinst"
+          echo 'fi' >> "$DEB_DIR/DEBIAN/postinst"
+          echo 'exit 0' >> "$DEB_DIR/DEBIAN/postinst"
+          chmod 755 "$DEB_DIR/DEBIAN/postinst"
+
+          # Add postrm script: clean up repo file on purge
+          echo '#!/bin/sh' > "$DEB_DIR/DEBIAN/postrm"
+          echo 'set -e' >> "$DEB_DIR/DEBIAN/postrm"
+          echo 'if [ "$1" = "purge" ]; then' >> "$DEB_DIR/DEBIAN/postrm"
+          echo '    rm -f /etc/apt/sources.list.d/docsearch.list' >> "$DEB_DIR/DEBIAN/postrm"
+          echo 'fi' >> "$DEB_DIR/DEBIAN/postrm"
+          echo 'exit 0' >> "$DEB_DIR/DEBIAN/postrm"
+          chmod 755 "$DEB_DIR/DEBIAN/postrm"
+
           dpkg-deb --build "$DEB_DIR" "dist/docsearch_${VERSION}_linux_amd64.deb"
 
           # 3. Generate SHA-256 Checksums
