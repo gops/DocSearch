@@ -18,7 +18,7 @@ use slint::{ComponentHandle, ModelRc, VecModel};
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
-const VERSION: &str = "0.2.2";
+const VERSION: &str = "0.2.3";
 const BANNER: &str = r#"
   ___             ____                      _     
  |   \  ___  __  / ___|  ___  __ _ _ _ __ _| |_   
@@ -127,6 +127,24 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let indexer = Arc::new(Indexer::open(&config.index_path)?);
     let extractor = Arc::new(ExtractorManager::new(config.ocr_enabled, config.ocr_command.clone()));
 
+    let available_pdf_tools = extractor::pdf::get_available_pdf_tools();
+    if !available_pdf_tools.is_empty() {
+        eprintln!(
+            "[Init] PDF text extractor tool(s) detected: {}.",
+            available_pdf_tools.join(", ")
+        );
+    } else {
+        eprintln!(
+            "[Notice] No PDF text extractor found (pdftotext / poppler-utils or gs / ghostscript).\n\
+             To enable indexing of PDF documents, install either tool:\n\
+               Ubuntu/Debian: sudo apt install poppler-utils  (or ghostscript)\n\
+               Fedora/RHEL:   sudo dnf install poppler-utils  (or ghostscript)\n\
+               Arch Linux:    sudo pacman -S poppler\n\
+               macOS:         brew install poppler (or ghostscript)\n\
+             (PDF files will be skipped until installed; DocSearch will not force install it.)"
+        );
+    }
+
     if extractor::ocr::is_ocr_available(&config.ocr_command) {
         eprintln!("[Init] OCR engine \"{}\" detected and active.", config.ocr_command);
     } else {
@@ -175,6 +193,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Initialize UI properties
     update_folders_model(&main_window, &config_arc);
+    main_window.set_has_pdf_tool(extractor::pdf::is_pdf_extractor_available());
 
     // Search query changed callback
     let idx_search = indexer.clone();
