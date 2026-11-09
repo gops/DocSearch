@@ -1,12 +1,12 @@
 # DocSearch 🔍
 
-> **Cross-platform, local document indexing & search application written in Go with Bluge, OCR support, system tray daemon, and GitHub Releases self-updating.**
+> **Cross-platform, local document indexing & search application written in Rust with Slint Native GUI, Tantivy BM25 search engine, native OS folder picker, OCR support, and system tray daemon.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Go Version](https://img.shields.io/badge/Go-1.27+-00ADD8.svg)](https://golang.org)
-[![CI](https://github.com/gops/DocSearch/actions/workflows/ci.yml/badge.svg)](https://github.com/gops/DocSearch/actions)
+[![Rust](https://img.shields.io/badge/Rust-1.75+-orange.svg)](https://www.rust-lang.org)
+[![Slint](https://img.shields.io/badge/GUI-Slint-blueviolet.svg)](https://slint.dev)
 
-DocSearch indexes your local documents, PDFs, Word files, code, and scanned images (via OCR). It runs unobtrusively in the background system tray, only crawling user-specified directories, and provides sub-millisecond search with keyword highlighting and in-place GitHub self-updating.
+DocSearch indexes your local documents, PDFs, Word files, code, and scanned images (via OCR). It features a **native desktop GUI built with Slint** (replacing embedded web browsers) alongside a complete CLI and background system tray daemon.
 
 ---
 
@@ -18,21 +18,22 @@ DocSearch indexes your local documents, PDFs, Word files, code, and scanned imag
 
 ## Key Features
 
+- **Native Slint Desktop GUI:** Fast, lightweight, GPU/software-rendered native desktop interface with responsive search-as-you-type, snippet highlighting, and dark mode.
+- **Native OS Folder Picker:** Uses the native operating system folder dialog (`rfd` / XDG Portal) to add directories directly without typing paths manually.
 - **Selective Folder Indexing:** Only scans and monitors folders you explicitly select. Does not index your entire drive or slow down your system.
 - **Large File Protection:** Automatically skips files exceeding the configured size limit (defaults to 25 MB, customizable via CLI, UI, or config; set to 0 for unlimited) to prevent memory spikes.
 - **Duplicate Document Detection:** Cryptographic SHA-256 content hashing instantly finds duplicate documents across all monitored directories, calculates wasted disk space, and lets you open or remove redundant copies via CLI and UI.
-- **System Tray Daemon:** Sits in your OS system tray (Windows notification area, macOS menu bar, Linux indicator) with quick access to search, folder re-scans, and update checks.
-- **Self-Updating via GitHub Releases:** Checks for latest binary releases from GitHub, verifies SHA-256 checksums, and applies atomic in-place updates.
-- **Pure Go Search Core:** Powered by [Bluge](https://github.com/blugelabs/bluge) for embedded, high-performance BM25 full-text indexing, prefix matching, and hit highlights.
-- **Real-Time Live Watching:** Integrated [`fsnotify`](https://github.com/fsnotify/fsnotify) detects file creations, edits, and deletions instantly.
+- **System Tray Daemon:** Sits in your OS system tray (StatusNotifierItem / SNI on Linux, Windows, macOS) with quick access to search, folder re-scans, and application exit.
+- **Pure Rust Search Core:** Powered by [Tantivy](https://github.com/quickwit-oss/tantivy) for embedded, high-performance BM25 full-text indexing, field boosting, and snippet highlighting.
+- **Real-Time Live Watching:** Integrated [`notify`](https://github.com/notify-rs/notify) detects file creations, edits, and deletions instantly with debouncing.
 - **Smart Change Detection:** Hash-based comparison (SHA-256) prevents re-indexing unchanged files, saving CPU cycles.
 - **Broad Document Extraction:**
-  - **Plain Text / Code:** `.txt`, `.md`, `.log`, `.csv`, `.json`, `.yaml`, `.go`, `.py`, `.js`, `.ts`, `.html`, etc.
-  - **Word Documents:** Pure Go `.docx` stream XML extractor (zero external C dependencies).
+  - **Plain Text / Code:** `.txt`, `.md`, `.log`, `.csv`, `.json`, `.yaml`, `.rs`, `.go`, `.py`, `.js`, `.ts`, `.html`, etc.
+  - **Word Documents:** Pure Rust `.docx` stream XML extractor (zero external C dependencies).
   - **PDFs:** Digital text extraction via `pdftotext` with automatic fallback to OCR.
-  - **Scanned Images (OCR):** Pluggable OCR interface supporting Tesseract or system OCR for `.png`, `.jpg`, `.jpeg`, `.tiff`.
+  - **Scanned Images (OCR):** Pluggable OCR interface supporting Tesseract for `.png`, `.jpg`, `.jpeg`, `.tiff`, `.bmp`, `.webp`.
 - **Dual Interface:**
-  - **Embedded Desktop / Web UI:** Responsive dark-themed search interface with live highlighted snippets, keyboard navigation, duplicate management, and one-click file opening.
+  - **Native Slint GUI:** Dark-themed search interface with live highlighted snippets, folder management drawer, and duplicate inspector.
   - **CLI Mode:** Instant search, directory management, duplicate reports, and status checks directly from your terminal.
 - **100% Offline & Private:** Zero telemetry, no cloud API keys, all data stays locally on your machine.
 - **MIT Licensed:** Free and open source.
@@ -43,124 +44,68 @@ DocSearch indexes your local documents, PDFs, Word files, code, and scanned imag
 
 ```
 DocSearch
-├── cmd/
-│   └── docsearch/         # Application entry point & CLI commands
-├── pkg/
-│   ├── config/            # JSON config management & folder list
-│   ├── indexer/           # Bluge search engine, BM25 ranking, highlighter
-│   ├── crawler/           # Directory walker, worker pool, and fsnotify watcher
-│   ├── extractor/         # Text & OCR parsers (Plain text, DOCX, PDF, OCR)
-│   ├── updater/           # GitHub Releases self-updater & checksum verifier
-│   ├── tray/              # Cross-platform system tray integration (fyne.io/systray)
-│   └── server/            # Local HTTP server & embedded HTML/CSS/JS UI
-├── .github/workflows/     # CI tests and automated GoReleaser release pipeline
-├── .goreleaser.yaml       # Multi-platform release configuration
+├── Cargo.toml             # Rust package manifest & dependencies
+├── build.rs               # Slint UI compiler build script
+├── ui/
+│   └── app.slint          # Native Slint GUI definitions and dark theme layout
+├── src/
+│   ├── main.rs            # Application entry point, Slint bindings, & CLI dispatch
+│   ├── lib.rs             # Core library exports
+│   ├── config.rs          # JSON configuration management & folder tracking
+│   ├── cli.rs             # Clap CLI command line parser
+│   ├── indexer/           # Tantivy search engine, BM25 ranking, & duplicate scanner
+│   ├── crawler/           # Directory walker, live notify watcher, & SHA-256 hashing
+│   ├── extractor/         # Text, DOCX, PDF, and OCR parsers
+│   └── tray.rs            # Background system tray daemon (ksni)
 ├── test_docs/             # Sample documents for verification
+├── tests/                 # Integration test suites (extractors, indexer, config)
 └── LICENSE                # MIT License
 ```
 
 ---
 
-## Installation on Linux (Ubuntu / Debian / Linux Mint / Pop!_OS)
-
-### Option A: Install via APT Repository (Auto-Updates with `apt upgrade`)
-Configure the official DocSearch APT repository to receive automated updates alongside your system packages:
-
-```bash
-# 1. Register DocSearch APT source
-echo "deb [trusted=yes] https://iam.patelgopal.com/DocSearch/ ./" | sudo tee /etc/apt/sources.list.d/docsearch.list
-
-# 2. Update and install
-sudo apt update
-sudo apt install docsearch
-```
-
-Any future `sudo apt update && sudo apt upgrade` will automatically update DocSearch!
-
----
-
-### Option B: Download .deb / .rpm (No Terminal Required)
-
-For graphical desktop users on Linux:
-
-1. Go to **[GitHub Releases](https://github.com/gops/DocSearch/releases)** and download the package for your distribution:
-   * **Ubuntu / Debian / Linux Mint / Pop!_OS**: Download `docsearch_<version>_linux_amd64.deb`
-   * **Fedora / RHEL / openSUSE**: Download `docsearch_<version>_linux_amd64.rpm`
-2. In your file manager, **double-click the downloaded `.deb` file**.
-3. Click the **Install** button in your App Center (or GDebi).
-4. Launch **DocSearch** directly from your application launcher or application menu.
-5. DocSearch will appear in your system tray and start running quietly.
-
----
-
-## Quick Start & Build (CLI / Developers)
+## Quick Start & Build (Rust / Cargo)
 
 ### 1. Build the Binary
 ```bash
-go build -o docsearch ./cmd/docsearch
+cargo build --release
 ```
-*(Produces a single, compact ~14MB executable).*
+*(Produces a standalone, optimized native binary at `target/release/docsearch`).*
 
 ### 2. Configure Folders to Index
 By default, DocSearch only indexes the folders you explicitly configure:
 ```bash
 # Add a folder to index
-./docsearch add /path/to/my/documents
+./target/release/docsearch add /path/to/my/documents
 
 # List all currently configured folders and total indexed documents
-./docsearch list
+./target/release/docsearch list
 ```
 
-### 3. Run with System Tray
+### 3. Run with Native Slint GUI & System Tray
 ```bash
-./docsearch
+./target/release/docsearch
 ```
-- A search icon appears in your system tray.
-- Right-click the tray icon to open the search UI, trigger folder rescans, check for updates, or quit.
-- To run in background terminal mode without a tray icon, pass `--headless`:
+- Launches the native Slint desktop window.
+- DocSearch sits in your system tray for quick access.
+- Click **"📂 + Add Folder"** to open your native OS folder chooser dialog.
+- To run in background daemon mode without opening the GUI window, pass `--headless`:
 ```bash
-./docsearch --headless
+./target/release/docsearch --headless
 ```
 
 ### 4. Search from the Command Line (CLI)
-You can also run instant terminal searches without opening the UI:
+You can run instant terminal searches without opening the GUI:
 ```bash
-./docsearch search "financial report"
-./docsearch search "cross platform"
+./target/release/docsearch search "financial report"
+./target/release/docsearch search "cross platform"
 ```
 
 ### 5. Find Duplicate Files
 Scan all indexed directories for duplicate documents and wasted disk space:
 ```bash
-./docsearch duplicates
+./target/release/docsearch duplicates
 ```
-
-### 6. Check and Apply Updates
-```bash
-# Check if a new version is available on GitHub
-./docsearch check-update
-
-# Automatically download, verify, and update the binary
-./docsearch update
-```
-You can also click the **⚡ Update** button in the Web UI.
-
----
-
-## Automated Releases (GoReleaser + GitHub Actions)
-
-DocSearch uses [GoReleaser](https://goreleaser.com) and GitHub Actions to automatically cross-compile and publish binaries:
-
-1. Push a semantic version tag:
-   ```bash
-   git tag -a v0.2.0 -m "Release v0.2.0"
-   git push origin v0.2.0
-   ```
-2. The GitHub Action will automatically:
-   - Build binaries for **Linux** (`amd64`, `arm64`), **macOS** (`amd64`, `arm64`), and **Windows** (`amd64`).
-   - Package `.tar.gz` and `.zip` archives.
-   - Generate `checksums.txt` (SHA-256).
-   - Create a GitHub Release with release notes.
 
 ---
 
@@ -174,17 +119,16 @@ DocSearch stores its configuration in `~/.config/docsearch/config.json` (or `./d
     "/path/to/my/documents",
     "/path/to/projects/notes"
   ],
-  "index_path": "~/.local/share/docsearch/bluge_index",
-  "server_port": 9876,
+  "index_path": "~/.local/share/docsearch/tantivy_index",
   "max_file_size_mb": 25,
   "ocr_enabled": true,
   "ocr_command": "tesseract",
   "github_repo": "gops/DocSearch",
   "file_extensions": [
-    ".txt", ".md", ".pdf", ".docx", ".csv", ".log", ".json", ".png", ".jpg"
+    ".txt", ".md", ".pdf", ".docx", ".csv", ".log", ".json", ".png", ".jpg", ".rs", ".go"
   ],
   "excluded_dirs": [
-    ".git", "node_modules", ".cache", "vendor", "tmp"
+    ".git", "node_modules", ".cache", "vendor", "tmp", "target"
   ]
 }
 ```
@@ -195,7 +139,7 @@ DocSearch stores its configuration in `~/.config/docsearch/config.json` (or `./d
 
 Run the full automated test suite:
 ```bash
-go test -v ./...
+cargo test
 ```
 
 ---

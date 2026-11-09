@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  goreleaser:
+  build-and-release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -17,18 +17,68 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "stable"
-          cache: true
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libgl1-mesa-dev dpkg-dev apt-utils
 
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release binary
+        run: cargo build --release --verbose
+
+      - name: Package Release Assets
+        id: package
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          VERSION="${TAG_NAME#v}"
+          mkdir -p dist
+
+          # 1. Archive tar.gz
+          cp target/release/docsearch dist/
+          cp LICENSE README.md dist/
+          tar -czvf "dist/docsearch_${VERSION}_linux_amd64.tar.gz" -C target/release docsearch
+
+          # 2. Package .deb
+          DEB_DIR="deb-staging"
+          mkdir -p "$DEB_DIR/DEBIAN"
+          mkdir -p "$DEB_DIR/usr/bin"
+          mkdir -p "$DEB_DIR/usr/share/applications"
+          mkdir -p "$DEB_DIR/usr/share/icons/hicolor/256x256/apps"
+
+          cp target/release/docsearch "$DEB_DIR/usr/bin/docsearch"
+          chmod 755 "$DEB_DIR/usr/bin/docsearch"
+          cp assets/docsearch.desktop "$DEB_DIR/usr/share/applications/"
+          cp assets/docsearch.png "$DEB_DIR/usr/share/icons/hicolor/256x256/apps/"
+
+          cat << EOF > "$DEB_DIR/DEBIAN/control"
+Package: docsearch
+Version: $VERSION
+Section: utils
+Priority: optional
+Architecture: amd64
+Maintainer: DocSearch Contributors <https://github.com/gops/DocSearch>
+Description: Local cross-platform document search with native Slint GUI and Tantivy
+Homepage: https://github.com/gops/DocSearch
+EOF
+
+          dpkg-deb --build "$DEB_DIR" "dist/docsearch_${VERSION}_linux_amd64.deb"
+
+          # 3. Generate SHA-256 Checksums
+          cd dist
+          sha256sum docsearch_${VERSION}_linux_amd64.* > checksums.txt
+          cd ..
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          distribution: goreleaser
-          version: latest
-          args: release --clean
+          files: |
+            dist/*.tar.gz
+            dist/*.deb
+            dist/checksums.txt
+          name: "DocSearch ${{ github.ref_name }}"
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -37,9 +87,6 @@ jobs:
         with:
           ref: gh-pages
           path: apt-repo
-
-      - name: Install APT repository tools
-        run: sudo apt-get update && sudo apt-get install -y dpkg-dev apt-utils
 
       - name: Update APT repository index & deploy to GitHub Pages
         run: |
@@ -57,7 +104,7 @@ jobs:
                          -o APT::FTPArchive::Release::Label="DocSearch" \
                          -o APT::FTPArchive::Release::Suite="stable" \
                          -o APT::FTPArchive::Release::Codename="stable" \
-                         -o APT::FTPArchive::Release::Architectures="amd64 arm64" \
+                         -o APT::FTPArchive::Release::Architectures="amd64" \
                          -o APT::FTPArchive::Release::Components="main" \
                          -o APT::FTPArchive::Release::Description="DocSearch APT Repository" \
                          release . > Release.tmp
@@ -69,4 +116,3 @@ jobs:
           git add -A
           git commit -m "Update APT repository for ${{ github.ref_name }}" || echo "No changes to commit"
           git push origin gh-pages
-

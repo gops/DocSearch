@@ -1,0 +1,746 @@
+import { Button, ScrollView, ListView } from "std-widgets.slint";
+
+export struct ResultItem {
+    path: string,
+    filename: string,
+    extension: string,
+    size_str: string,
+    mod_time_str: string,
+    is_ocr: bool,
+    highlight: string,
+}
+
+export struct FolderItem {
+    path: string,
+}
+
+export struct DuplicateFileItem {
+    path: string,
+    size_str: string,
+}
+
+export struct DuplicateGroupItem {
+    hash_short: string,
+    size_str: string,
+    wasted_str: string,
+    count: int,
+    first_path: string,
+    second_path: string,
+}
+
+export component AppWindow inherits Window {
+    title: "DocSearch — Desktop Document Search";
+    min-width: 750px;
+    min-height: 550px;
+    preferred-width: 950px;
+    preferred-height: 700px;
+    background: #11141c;
+    default-font-family: "sans-serif";
+
+    // Callbacks to Rust
+    callback search_query_changed(string);
+    callback add_folder_clicked();
+    callback remove_folder(string);
+    callback trigger_rescan();
+    callback refresh_duplicates();
+    callback open_file(string);
+    callback show_in_folder(string);
+    callback delete_duplicate_file(string);
+
+    // Properties bound from Rust
+    in-out property <string> search_text: "";
+    in-out property <string> status_text: "Idle";
+    in-out property <bool> is_indexing: false;
+    in-out property <string> metrics_text: "";
+    in-out property <bool> has_results: false;
+    in-out property <int> folder_count: 0;
+
+    in-out property <bool> show_folders: false;
+    in-out property <bool> show_duplicates: false;
+    in-out property <string> duplicates_summary: "No duplicates found";
+
+    in-out property <[ResultItem]> results: [];
+    in-out property <[FolderItem]> folders: [];
+    in-out property <[DuplicateGroupItem]> duplicate_groups: [];
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 12px;
+
+        // Header bar
+        HorizontalLayout {
+            height: 42px;
+            spacing: 12px;
+            alignment: space-between;
+
+            // Brand
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: start;
+
+                Text {
+                    text: "🔍";
+                    font-size: 24px;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: "DocSearch";
+                    font-size: 20px;
+                    font-weight: 700;
+                    color: #ffffff;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    width: 52px;
+                    height: 22px;
+                    border-radius: 4px;
+                    background: #252d3d;
+                    y: (parent.height - self.height) / 2;
+
+                    Text {
+                        text: "v0.2.0";
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: #94a3b8;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // Actions & Status
+            HorizontalLayout {
+                spacing: 10px;
+                alignment: end;
+
+                // Status Pill
+                Rectangle {
+                    border-radius: 14px;
+                    background: #1a202c;
+                    border-width: 1px;
+                    border-color: root.is_indexing ? #f59e0b : #2d3748;
+                    height: 28px;
+                    y: (parent.height - self.height) / 2;
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 6px;
+
+                        Rectangle {
+                            width: 8px;
+                            height: 8px;
+                            border-radius: 4px;
+                            background: root.is_indexing ? #f59e0b : #10b981;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        Text {
+                            text: root.status_text;
+                            font-size: 12px;
+                            color: #cbd5e1;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // Duplicates Toggle Button
+                Rectangle {
+                    border-radius: 6px;
+                    background: root.show_duplicates ? #4338ca : #1e2433;
+                    border-width: 1px;
+                    border-color: #374151;
+                    height: 32px;
+                    y: (parent.height - self.height) / 2;
+
+                    TouchArea {
+                        clicked => {
+                            root.show_duplicates = !root.show_duplicates;
+                            if (root.show_duplicates) {
+                                root.show_folders = false;
+                                root.refresh_duplicates();
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        Text {
+                            text: "📑 Duplicates";
+                            font-size: 13px;
+                            font-weight: 500;
+                            color: #f1f5f9;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // Folders Toggle Button
+                Rectangle {
+                    border-radius: 6px;
+                    background: root.show_folders ? #4338ca : #1e2433;
+                    border-width: 1px;
+                    border-color: #374151;
+                    height: 32px;
+                    y: (parent.height - self.height) / 2;
+
+                    TouchArea {
+                        clicked => {
+                            root.show_folders = !root.show_folders;
+                            if (root.show_folders) {
+                                root.show_duplicates = false;
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        Text {
+                            text: "📁 Folders (" + root.folder_count + ")";
+                            font-size: 13px;
+                            font-weight: 500;
+                            color: #f1f5f9;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Folders Drawer
+        if root.show_folders : Rectangle {
+            border-radius: 8px;
+            background: #171c26;
+            border-width: 1px;
+            border-color: #2b3547;
+
+            VerticalLayout {
+                padding: 14px;
+                spacing: 10px;
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    VerticalLayout {
+                        Text {
+                            text: "Indexed Folders";
+                            font-size: 15px;
+                            font-weight: 600;
+                            color: #ffffff;
+                        }
+                        Text {
+                            text: "Only documents within these folders will be indexed";
+                            font-size: 12px;
+                            color: #94a3b8;
+                        }
+                    }
+
+                    // Native Folder Picker Button (No text input!)
+                    Rectangle {
+                        border-radius: 6px;
+                        background: #4f46e5;
+                        height: 32px;
+
+                        TouchArea {
+                            clicked => { root.add_folder_clicked(); }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 14px;
+                            padding-right: 14px;
+                            spacing: 6px;
+                            Text {
+                                text: "📂 + Add Folder (Native Picker)";
+                                font-size: 13px;
+                                font-weight: 600;
+                                color: #ffffff;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // Folder list
+                for folder in root.folders : Rectangle {
+                    height: 36px;
+                    border-radius: 6px;
+                    background: #1e2433;
+
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        alignment: space-between;
+
+                        Text {
+                            text: "📁 " + folder.path;
+                            font-size: 13px;
+                            color: #e2e8f0;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+
+                        Rectangle {
+                            width: 70px;
+                            height: 24px;
+                            border-radius: 4px;
+                            background: #3f1d24;
+                            y: (parent.height - self.height) / 2;
+
+                            TouchArea {
+                                clicked => { root.remove_folder(folder.path); }
+                            }
+
+                            Text {
+                                text: "Remove";
+                                font-size: 11px;
+                                font-weight: 600;
+                                color: #f87171;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                if root.folders.length == 0 : Text {
+                    text: "No folders added yet. Click '+ Add Folder' above to choose a folder to index.";
+                    font-size: 13px;
+                    color: #94a3b8;
+                    horizontal-alignment: center;
+                }
+
+                HorizontalLayout {
+                    alignment: end;
+                    Rectangle {
+                        border-radius: 6px;
+                        background: #d97706;
+                        height: 30px;
+
+                        TouchArea {
+                            clicked => { root.trigger_rescan(); }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            Text {
+                                text: "🔄 Trigger Re-scan";
+                                font-size: 12px;
+                                font-weight: 600;
+                                color: #ffffff;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Duplicates Drawer
+        if root.show_duplicates : Rectangle {
+            border-radius: 8px;
+            background: #171c26;
+            border-width: 1px;
+            border-color: #2b3547;
+            max-height: 280px;
+
+            VerticalLayout {
+                padding: 14px;
+                spacing: 10px;
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    VerticalLayout {
+                        Text {
+                            text: "Duplicate Document Detection";
+                            font-size: 15px;
+                            font-weight: 600;
+                            color: #ffffff;
+                        }
+                        Text {
+                            text: root.duplicates_summary;
+                            font-size: 12px;
+                            color: #38bdf8;
+                        }
+                    }
+
+                    Rectangle {
+                        border-radius: 6px;
+                        background: #1e2433;
+                        border-width: 1px;
+                        border-color: #374151;
+                        height: 30px;
+
+                        TouchArea {
+                            clicked => { root.refresh_duplicates(); }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            Text {
+                                text: "🔄 Refresh";
+                                font-size: 12px;
+                                color: #e2e8f0;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                ScrollView {
+                    VerticalLayout {
+                        spacing: 8px;
+
+                        for grp in root.duplicate_groups : Rectangle {
+                            border-radius: 6px;
+                            background: #1c2230;
+
+                            VerticalLayout {
+                                padding: 8px;
+                                spacing: 4px;
+
+                                HorizontalLayout {
+                                    alignment: space-between;
+                                    Text {
+                                        text: "Hash: " + grp.hash_short + " • Size: " + grp.size_str + " • Wasted: " + grp.wasted_str;
+                                        font-size: 12px;
+                                        font-weight: 600;
+                                        color: #fbbf24;
+                                    }
+                                }
+
+                                if grp.first_path != "" : HorizontalLayout {
+                                    spacing: 8px;
+                                    Text {
+                                        text: "[1] " + grp.first_path;
+                                        font-size: 11px;
+                                        color: #cbd5e1;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+                                    Rectangle {
+                                        width: 45px;
+                                        height: 20px;
+                                        background: #2563eb;
+                                        border-radius: 3px;
+                                        TouchArea { clicked => { root.open_file(grp.first_path); } }
+                                        Text { text: "Open"; font-size: 10px; color: #fff; horizontal-alignment: center; vertical-alignment: center; }
+                                    }
+                                }
+
+                                if grp.second_path != "" : HorizontalLayout {
+                                    spacing: 8px;
+                                    Text {
+                                        text: "[2] " + grp.second_path;
+                                        font-size: 11px;
+                                        color: #cbd5e1;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+                                    Rectangle {
+                                        width: 45px;
+                                        height: 20px;
+                                        background: #2563eb;
+                                        border-radius: 3px;
+                                        TouchArea { clicked => { root.open_file(grp.second_path); } }
+                                        Text { text: "Open"; font-size: 10px; color: #fff; horizontal-alignment: center; vertical-alignment: center; }
+                                    }
+                                    Rectangle {
+                                        width: 50px;
+                                        height: 20px;
+                                        background: #dc2626;
+                                        border-radius: 3px;
+                                        TouchArea { clicked => { root.delete_duplicate_file(grp.second_path); } }
+                                        Text { text: "Delete"; font-size: 10px; color: #fff; horizontal-alignment: center; vertical-alignment: center; }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Search Input Bar
+        Rectangle {
+            height: 48px;
+            border-radius: 8px;
+            background: #1a202c;
+            border-width: 1px;
+            border-color: #374151;
+
+            HorizontalLayout {
+                padding-left: 14px;
+                padding-right: 14px;
+                spacing: 10px;
+
+                Text {
+                    text: "🔍";
+                    font-size: 18px;
+                    vertical-alignment: center;
+                }
+
+                input := TextInput {
+                    text <=> root.search_text;
+                    font-size: 15px;
+                    color: #ffffff;
+                    vertical-alignment: center;
+                    edited => { root.search_query_changed(self.text); }
+                }
+
+                if root.search_text != "" : Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 12px;
+                    background: #2d3748;
+                    y: (parent.height - self.height) / 2;
+
+                    TouchArea {
+                        clicked => {
+                            root.search_text = "";
+                            root.search_query_changed("");
+                        }
+                    }
+
+                    Text {
+                        text: "✕";
+                        font-size: 12px;
+                        color: #94a3b8;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // Metrics Bar
+        if root.metrics_text != "" : HorizontalLayout {
+            height: 22px;
+            Text {
+                text: root.metrics_text;
+                font-size: 12px;
+                color: #94a3b8;
+                vertical-alignment: center;
+            }
+        }
+
+        // Results Section
+        ScrollView {
+            VerticalLayout {
+                spacing: 10px;
+                padding-bottom: 20px;
+
+                for item in root.results : Rectangle {
+                    border-radius: 8px;
+                    background: #171c26;
+                    border-width: 1px;
+                    border-color: #263042;
+
+                    VerticalLayout {
+                        padding: 12px;
+                        spacing: 6px;
+
+                        // Top row: extension badge, filename, OCR badge, open buttons
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: space-between;
+
+                            HorizontalLayout {
+                                spacing: 8px;
+
+                                // Extension badge
+                                Rectangle {
+                                    border-radius: 4px;
+                                    background: #222b3b;
+                                    height: 22px;
+                                    HorizontalLayout {
+                                        padding-left: 6px;
+                                        padding-right: 6px;
+                                        Text {
+                                            text: item.extension;
+                                            font-size: 11px;
+                                            font-weight: 700;
+                                            color: #60a5fa;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+
+                                // Filename
+                                Text {
+                                    text: item.filename;
+                                    font-size: 15px;
+                                    font-weight: 600;
+                                    color: #38bdf8;
+                                    vertical-alignment: center;
+                                }
+
+                                if item.is_ocr : Rectangle {
+                                    border-radius: 4px;
+                                    background: #064e3b;
+                                    height: 20px;
+                                    HorizontalLayout {
+                                        padding-left: 5px;
+                                        padding-right: 5px;
+                                        Text {
+                                            text: "OCR";
+                                            font-size: 10px;
+                                            font-weight: 700;
+                                            color: #34d399;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Open actions
+                            HorizontalLayout {
+                                spacing: 6px;
+
+                                Rectangle {
+                                    border-radius: 4px;
+                                    background: #1e293b;
+                                    border-width: 1px;
+                                    border-color: #334155;
+                                    height: 24px;
+
+                                    TouchArea {
+                                        clicked => { root.open_file(item.path); }
+                                    }
+
+                                    HorizontalLayout {
+                                        padding-left: 8px;
+                                        padding-right: 8px;
+                                        Text {
+                                            text: "Open";
+                                            font-size: 11px;
+                                            font-weight: 500;
+                                            color: #e2e8f0;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    border-radius: 4px;
+                                    background: #1e293b;
+                                    border-width: 1px;
+                                    border-color: #334155;
+                                    height: 24px;
+
+                                    TouchArea {
+                                        clicked => { root.show_in_folder(item.path); }
+                                    }
+
+                                    HorizontalLayout {
+                                        padding-left: 8px;
+                                        padding-right: 8px;
+                                        Text {
+                                            text: "Folder";
+                                            font-size: 11px;
+                                            font-weight: 500;
+                                            color: #e2e8f0;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Path & meta info
+                        HorizontalLayout {
+                            spacing: 12px;
+                            Text {
+                                text: item.path;
+                                font-size: 12px;
+                                color: #64748b;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+                            Text {
+                                text: item.size_str + " • " + item.mod_time_str;
+                                font-size: 11px;
+                                color: #64748b;
+                            }
+                        }
+
+                        // Snippet highlight
+                        if item.highlight != "" : Rectangle {
+                            border-radius: 4px;
+                            background: #11151f;
+
+                            HorizontalLayout {
+                                padding: 8px;
+                                Text {
+                                    text: item.highlight;
+                                    font-size: 12px;
+                                    color: #cbd5e1;
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Empty state
+                if !root.has_results && root.search_text == "" : Rectangle {
+                    height: 220px;
+
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 8px;
+
+                        Text {
+                            text: "📂";
+                            font-size: 40px;
+                            horizontal-alignment: center;
+                        }
+
+                        Text {
+                            text: "Type a keyword above to search indexed documents";
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: #94a3b8;
+                            horizontal-alignment: center;
+                        }
+
+                        Text {
+                            text: "Use the 'Folders' button above to configure which directories to monitor.";
+                            font-size: 12px;
+                            color: #64748b;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+
+                if !root.has_results && root.search_text != "" : Rectangle {
+                    height: 180px;
+
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 8px;
+
+                        Text {
+                            text: "🔎 No matches found";
+                            font-size: 15px;
+                            font-weight: 600;
+                            color: #94a3b8;
+                            horizontal-alignment: center;
+                        }
+
+                        Text {
+                            text: "Try searching for another term, or verify folders are indexed.";
+                            font-size: 12px;
+                            color: #64748b;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

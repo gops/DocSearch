@@ -1,4 +1,6 @@
-# Root Binary
+# Rust build artifacts
+/target/
+
 /docsearch
 /docsearch.exe
 *.exe
