@@ -183,6 +183,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     eprintln!("[Shutdown] Shutting down DocSearch daemon...");
                     std::process::exit(0);
                 }
+                tray::TrayAction::Restart => {
+                    eprintln!("[Restart] Restart requested from system tray in daemon mode...");
+                    tray::restart_application();
+                }
                 _ => {}
             }
         }
@@ -444,6 +448,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 tray::TrayAction::Rescan => {
                     let c = crawler_tray.clone();
                     std::thread::spawn(move || c.scan_all());
+                }
+                tray::TrayAction::Restart => {
+                    eprintln!("[Tray] Restart requested from system tray to apply update...");
+                    tray::restart_application();
                 }
                 tray::TrayAction::Quit => {
                     eprintln!("[Shutdown] Quit requested from system tray. Terminating DocSearch...");

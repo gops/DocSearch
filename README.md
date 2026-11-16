@@ -23,7 +23,7 @@ DocSearch indexes your local documents, PDFs, Word files, code, and scanned imag
 - **Selective Folder Indexing:** Only scans and monitors folders you explicitly select. Does not index your entire drive or slow down your system.
 - **Large File Protection:** Automatically skips files exceeding the configured size limit (defaults to 25 MB, customizable via CLI, UI, or config; set to 0 for unlimited) to prevent memory spikes.
 - **Duplicate Document Detection:** Cryptographic SHA-256 content hashing instantly finds duplicate documents across all monitored directories, calculates wasted disk space, and lets you open or remove redundant copies via CLI and UI.
-- **System Tray Daemon:** Sits in your OS system tray (StatusNotifierItem / SNI on Linux, Windows, macOS) with quick access to search, folder re-scans, and application exit.
+- **System Tray Daemon & Seamless Restart on Update:** Sits in your OS system tray (StatusNotifierItem / SNI on Linux, Windows, macOS) with quick access to search, folder re-scans, and application exit. When DocSearch is updated (e.g. via package upgrade or binary replacement), right-clicking the tray icon dynamically presents **"🚀 Restart to Apply Update"** to cleanly relaunch the new version.
 - **Pure Rust Search Core:** Powered by [Tantivy](https://github.com/quickwit-oss/tantivy) for embedded, high-performance BM25 full-text indexing, field boosting, and snippet highlighting.
 - **Real-Time Live Watching:** Integrated [`notify`](https://github.com/notify-rs/notify) detects file creations, edits, and deletions instantly with debouncing.
 - **Smart Change Detection:** Hash-based comparison (SHA-256) prevents re-indexing unchanged files, saving CPU cycles.
