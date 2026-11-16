@@ -34,7 +34,7 @@ export component AppWindow inherits Window {
     min-height: 550px;
     preferred-width: 950px;
     preferred-height: 700px;
-    background: #11141c;
+    background: root.bg_window;
     default-font-family: "sans-serif";
 
     // Callbacks to Rust
@@ -46,6 +46,7 @@ export component AppWindow inherits Window {
     callback open_file(string);
     callback show_in_folder(string);
     callback delete_duplicate_file(string);
+    callback toggle_theme();
 
     // Properties bound from Rust
     in-out property <string> search_text: "";
@@ -63,6 +64,40 @@ export component AppWindow inherits Window {
     in-out property <[ResultItem]> results: [];
     in-out property <[FolderItem]> folders: [];
     in-out property <[DuplicateGroupItem]> duplicate_groups: [];
+
+    // Theme properties bound from Rust
+    in-out property <bool> is_dark: true;
+    in-out property <string> theme_mode: "auto";
+    in-out property <string> theme_button_text: "🌓 Auto";
+
+    // Theme palette
+    property <color> bg_window: root.is_dark ? #11141c : #f8fafc;
+    property <color> bg_card: root.is_dark ? #171c26 : #ffffff;
+    property <color> bg_card_secondary: root.is_dark ? #1e2433 : #f1f5f9;
+    property <color> bg_input: root.is_dark ? #1a202c : #ffffff;
+    property <color> bg_badge: root.is_dark ? #252d3d : #e2e8f0;
+    property <color> bg_badge_ext: root.is_dark ? #222b3b : #e0f2fe;
+    property <color> bg_snippet: root.is_dark ? #11151f : #f1f5f9;
+    property <color> bg_btn_action: root.is_dark ? #1e293b : #f1f5f9;
+    property <color> bg_status: root.is_dark ? #1a202c : #ffffff;
+    property <color> bg_btn_nav: root.is_dark ? #1e2433 : #ffffff;
+    property <color> bg_btn_clear: root.is_dark ? #2d3748 : #e2e8f0;
+
+    property <color> border_card: root.is_dark ? #263042 : #e2e8f0;
+    property <color> border_drawer: root.is_dark ? #2b3547 : #e2e8f0;
+    property <color> border_input: root.is_dark ? #374151 : #cbd5e1;
+    property <color> border_btn: root.is_dark ? #374151 : #cbd5e1;
+    property <color> border_action: root.is_dark ? #334155 : #cbd5e1;
+
+    property <color> text_title: root.is_dark ? #ffffff : #0f172a;
+    property <color> text_badge: root.is_dark ? #94a3b8 : #475569;
+    property <color> text_badge_ext: root.is_dark ? #60a5fa : #0369a1;
+    property <color> text_primary: root.is_dark ? #f1f5f9 : #1e293b;
+    property <color> text_secondary: root.is_dark ? #cbd5e1 : #334155;
+    property <color> text_muted: root.is_dark ? #94a3b8 : #64748b;
+    property <color> text_link: root.is_dark ? #38bdf8 : #0284c7;
+    property <color> text_status: root.is_dark ? #cbd5e1 : #334155;
+    property <color> text_action: root.is_dark ? #e2e8f0 : #1e293b;
 
     VerticalLayout {
         padding: 16px;
@@ -89,7 +124,7 @@ export component AppWindow inherits Window {
                     text: "DocSearch";
                     font-size: 20px;
                     font-weight: 700;
-                    color: #ffffff;
+                    color: root.text_title;
                     vertical-alignment: center;
                 }
 
@@ -97,14 +132,14 @@ export component AppWindow inherits Window {
                     width: 52px;
                     height: 22px;
                     border-radius: 4px;
-                    background: #252d3d;
+                    background: root.bg_badge;
                     y: (parent.height - self.height) / 2;
 
                     Text {
-                        text: "v0.2.0";
+                        text: "v0.2.4";
                         font-size: 11px;
                         font-weight: 600;
-                        color: #94a3b8;
+                        color: root.text_badge;
                         horizontal-alignment: center;
                         vertical-alignment: center;
                     }
@@ -119,9 +154,9 @@ export component AppWindow inherits Window {
                 // Status Pill
                 Rectangle {
                     border-radius: 14px;
-                    background: #1a202c;
+                    background: root.bg_status;
                     border-width: 1px;
-                    border-color: root.is_indexing ? #f59e0b : #2d3748;
+                    border-color: root.is_indexing ? #f59e0b : root.border_btn;
                     height: 28px;
                     y: (parent.height - self.height) / 2;
 
@@ -141,7 +176,36 @@ export component AppWindow inherits Window {
                         Text {
                             text: root.status_text;
                             font-size: 12px;
-                            color: #cbd5e1;
+                            color: root.text_status;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // Theme Toggle Button
+                Rectangle {
+                    border-radius: 6px;
+                    background: root.bg_btn_nav;
+                    border-width: 1px;
+                    border-color: root.border_btn;
+                    height: 32px;
+                    y: (parent.height - self.height) / 2;
+
+                    TouchArea {
+                        clicked => {
+                            root.toggle_theme();
+                        }
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 4px;
+                        Text {
+                            text: root.theme_button_text;
+                            font-size: 13px;
+                            font-weight: 500;
+                            color: root.text_primary;
                             vertical-alignment: center;
                         }
                     }
@@ -150,9 +214,9 @@ export component AppWindow inherits Window {
                 // Duplicates Toggle Button
                 Rectangle {
                     border-radius: 6px;
-                    background: root.show_duplicates ? #4338ca : #1e2433;
+                    background: root.show_duplicates ? #4338ca : root.bg_btn_nav;
                     border-width: 1px;
-                    border-color: #374151;
+                    border-color: root.border_btn;
                     height: 32px;
                     y: (parent.height - self.height) / 2;
 
@@ -173,7 +237,7 @@ export component AppWindow inherits Window {
                             text: "📑 Duplicates";
                             font-size: 13px;
                             font-weight: 500;
-                            color: #f1f5f9;
+                            color: root.show_duplicates ? #ffffff : root.text_primary;
                             vertical-alignment: center;
                         }
                     }
@@ -182,9 +246,9 @@ export component AppWindow inherits Window {
                 // Folders Toggle Button
                 Rectangle {
                     border-radius: 6px;
-                    background: root.show_folders ? #4338ca : #1e2433;
+                    background: root.show_folders ? #4338ca : root.bg_btn_nav;
                     border-width: 1px;
-                    border-color: #374151;
+                    border-color: root.border_btn;
                     height: 32px;
                     y: (parent.height - self.height) / 2;
 
@@ -204,7 +268,7 @@ export component AppWindow inherits Window {
                             text: "📁 Folders (" + root.folder_count + ")";
                             font-size: 13px;
                             font-weight: 500;
-                            color: #f1f5f9;
+                            color: root.show_folders ? #ffffff : root.text_primary;
                             vertical-alignment: center;
                         }
                     }
@@ -215,9 +279,9 @@ export component AppWindow inherits Window {
         // Folders Drawer
         if root.show_folders : Rectangle {
             border-radius: 8px;
-            background: #171c26;
+            background: root.bg_card;
             border-width: 1px;
-            border-color: #2b3547;
+            border-color: root.border_drawer;
 
             VerticalLayout {
                 padding: 14px;
@@ -230,12 +294,12 @@ export component AppWindow inherits Window {
                             text: "Indexed Folders";
                             font-size: 15px;
                             font-weight: 600;
-                            color: #ffffff;
+                            color: root.text_title;
                         }
                         Text {
                             text: "Only documents within these folders will be indexed";
                             font-size: 12px;
-                            color: #94a3b8;
+                            color: root.text_muted;
                         }
                     }
 
@@ -268,7 +332,7 @@ export component AppWindow inherits Window {
                 for folder in root.folders : Rectangle {
                     height: 36px;
                     border-radius: 6px;
-                    background: #1e2433;
+                    background: root.bg_card_secondary;
 
                     HorizontalLayout {
                         padding-left: 12px;
@@ -278,7 +342,7 @@ export component AppWindow inherits Window {
                         Text {
                             text: "📁 " + folder.path;
                             font-size: 13px;
-                            color: #e2e8f0;
+                            color: root.text_primary;
                             vertical-alignment: center;
                             overflow: elide;
                         }
@@ -287,7 +351,7 @@ export component AppWindow inherits Window {
                             width: 70px;
                             height: 24px;
                             border-radius: 4px;
-                            background: #3f1d24;
+                            background: root.is_dark ? #3f1d24 : #fee2e2;
                             y: (parent.height - self.height) / 2;
 
                             TouchArea {
@@ -298,7 +362,7 @@ export component AppWindow inherits Window {
                                 text: "Remove";
                                 font-size: 11px;
                                 font-weight: 600;
-                                color: #f87171;
+                                color: root.is_dark ? #f87171 : #dc2626;
                                 horizontal-alignment: center;
                                 vertical-alignment: center;
                             }
@@ -309,7 +373,7 @@ export component AppWindow inherits Window {
                 if root.folders.length == 0 : Text {
                     text: "No folders added yet. Click '+ Add Folder' above to choose a folder to index.";
                     font-size: 13px;
-                    color: #94a3b8;
+                    color: root.text_muted;
                     horizontal-alignment: center;
                 }
 
@@ -343,9 +407,9 @@ export component AppWindow inherits Window {
         // Duplicates Drawer
         if root.show_duplicates : Rectangle {
             border-radius: 8px;
-            background: #171c26;
+            background: root.bg_card;
             border-width: 1px;
-            border-color: #2b3547;
+            border-color: root.border_drawer;
             max-height: 280px;
 
             VerticalLayout {
@@ -359,20 +423,20 @@ export component AppWindow inherits Window {
                             text: "Duplicate Document Detection";
                             font-size: 15px;
                             font-weight: 600;
-                            color: #ffffff;
+                            color: root.text_title;
                         }
                         Text {
                             text: root.duplicates_summary;
                             font-size: 12px;
-                            color: #38bdf8;
+                            color: root.text_link;
                         }
                     }
 
                     Rectangle {
                         border-radius: 6px;
-                        background: #1e2433;
+                        background: root.bg_btn_nav;
                         border-width: 1px;
-                        border-color: #374151;
+                        border-color: root.border_btn;
                         height: 30px;
 
                         TouchArea {
@@ -385,7 +449,7 @@ export component AppWindow inherits Window {
                             Text {
                                 text: "🔄 Refresh";
                                 font-size: 12px;
-                                color: #e2e8f0;
+                                color: root.text_primary;
                                 vertical-alignment: center;
                             }
                         }
@@ -398,7 +462,7 @@ export component AppWindow inherits Window {
 
                         for grp in root.duplicate_groups : Rectangle {
                             border-radius: 6px;
-                            background: #1c2230;
+                            background: root.bg_card_secondary;
 
                             VerticalLayout {
                                 padding: 8px;
@@ -410,7 +474,7 @@ export component AppWindow inherits Window {
                                         text: "Hash: " + grp.hash_short + " • Size: " + grp.size_str + " • Wasted: " + grp.wasted_str;
                                         font-size: 12px;
                                         font-weight: 600;
-                                        color: #fbbf24;
+                                        color: root.is_dark ? #fbbf24 : #d97706;
                                     }
                                 }
 
@@ -419,7 +483,7 @@ export component AppWindow inherits Window {
                                     Text {
                                         text: "[1] " + grp.first_path;
                                         font-size: 11px;
-                                        color: #cbd5e1;
+                                        color: root.text_secondary;
                                         overflow: elide;
                                         horizontal-stretch: 1;
                                     }
@@ -438,7 +502,7 @@ export component AppWindow inherits Window {
                                     Text {
                                         text: "[2] " + grp.second_path;
                                         font-size: 11px;
-                                        color: #cbd5e1;
+                                        color: root.text_secondary;
                                         overflow: elide;
                                         horizontal-stretch: 1;
                                     }
@@ -470,9 +534,9 @@ export component AppWindow inherits Window {
         Rectangle {
             height: 48px;
             border-radius: 8px;
-            background: #1a202c;
+            background: root.bg_input;
             border-width: 1px;
-            border-color: #374151;
+            border-color: root.border_input;
 
             HorizontalLayout {
                 padding-left: 14px;
@@ -488,7 +552,7 @@ export component AppWindow inherits Window {
                 input := TextInput {
                     text <=> root.search_text;
                     font-size: 15px;
-                    color: #ffffff;
+                    color: root.text_title;
                     vertical-alignment: center;
                     edited => { root.search_query_changed(self.text); }
                 }
@@ -497,7 +561,7 @@ export component AppWindow inherits Window {
                     width: 24px;
                     height: 24px;
                     border-radius: 12px;
-                    background: #2d3748;
+                    background: root.bg_btn_clear;
                     y: (parent.height - self.height) / 2;
 
                     TouchArea {
@@ -510,7 +574,7 @@ export component AppWindow inherits Window {
                     Text {
                         text: "✕";
                         font-size: 12px;
-                        color: #94a3b8;
+                        color: root.text_muted;
                         horizontal-alignment: center;
                         vertical-alignment: center;
                     }
@@ -524,7 +588,7 @@ export component AppWindow inherits Window {
             Text {
                 text: root.metrics_text;
                 font-size: 12px;
-                color: #94a3b8;
+                color: root.text_muted;
                 vertical-alignment: center;
             }
         }
@@ -559,9 +623,9 @@ export component AppWindow inherits Window {
 
                 for item in root.results : Rectangle {
                     border-radius: 8px;
-                    background: #171c26;
+                    background: root.bg_card;
                     border-width: 1px;
-                    border-color: #263042;
+                    border-color: root.border_card;
 
                     VerticalLayout {
                         padding: 12px;
@@ -578,7 +642,7 @@ export component AppWindow inherits Window {
                                 // Extension badge
                                 Rectangle {
                                     border-radius: 4px;
-                                    background: #222b3b;
+                                    background: root.bg_badge_ext;
                                     height: 22px;
                                     HorizontalLayout {
                                         padding-left: 6px;
@@ -587,7 +651,7 @@ export component AppWindow inherits Window {
                                             text: item.extension;
                                             font-size: 11px;
                                             font-weight: 700;
-                                            color: #60a5fa;
+                                            color: root.text_badge_ext;
                                             vertical-alignment: center;
                                         }
                                     }
@@ -598,13 +662,13 @@ export component AppWindow inherits Window {
                                     text: item.filename;
                                     font-size: 15px;
                                     font-weight: 600;
-                                    color: #38bdf8;
+                                    color: root.text_link;
                                     vertical-alignment: center;
                                 }
 
                                 if item.is_ocr : Rectangle {
                                     border-radius: 4px;
-                                    background: #064e3b;
+                                    background: root.is_dark ? #064e3b : #d1fae5;
                                     height: 20px;
                                     HorizontalLayout {
                                         padding-left: 5px;
@@ -613,7 +677,7 @@ export component AppWindow inherits Window {
                                             text: "OCR";
                                             font-size: 10px;
                                             font-weight: 700;
-                                            color: #34d399;
+                                            color: root.is_dark ? #34d399 : #065f46;
                                             vertical-alignment: center;
                                         }
                                     }
@@ -626,9 +690,9 @@ export component AppWindow inherits Window {
 
                                 Rectangle {
                                     border-radius: 4px;
-                                    background: #1e293b;
+                                    background: root.bg_btn_action;
                                     border-width: 1px;
-                                    border-color: #334155;
+                                    border-color: root.border_action;
                                     height: 24px;
 
                                     TouchArea {
@@ -642,7 +706,7 @@ export component AppWindow inherits Window {
                                             text: "Open";
                                             font-size: 11px;
                                             font-weight: 500;
-                                            color: #e2e8f0;
+                                            color: root.text_action;
                                             vertical-alignment: center;
                                         }
                                     }
@@ -650,9 +714,9 @@ export component AppWindow inherits Window {
 
                                 Rectangle {
                                     border-radius: 4px;
-                                    background: #1e293b;
+                                    background: root.bg_btn_action;
                                     border-width: 1px;
-                                    border-color: #334155;
+                                    border-color: root.border_action;
                                     height: 24px;
 
                                     TouchArea {
@@ -666,7 +730,7 @@ export component AppWindow inherits Window {
                                             text: "Folder";
                                             font-size: 11px;
                                             font-weight: 500;
-                                            color: #e2e8f0;
+                                            color: root.text_action;
                                             vertical-alignment: center;
                                         }
                                     }
@@ -680,28 +744,28 @@ export component AppWindow inherits Window {
                             Text {
                                 text: item.path;
                                 font-size: 12px;
-                                color: #64748b;
+                                color: root.text_muted;
                                 overflow: elide;
                                 horizontal-stretch: 1;
                             }
                             Text {
                                 text: item.size_str + " • " + item.mod_time_str;
                                 font-size: 11px;
-                                color: #64748b;
+                                color: root.text_muted;
                             }
                         }
 
                         // Snippet highlight
                         if item.highlight != "" : Rectangle {
                             border-radius: 4px;
-                            background: #11151f;
+                            background: root.bg_snippet;
 
                             HorizontalLayout {
                                 padding: 8px;
                                 Text {
                                     text: item.highlight;
                                     font-size: 12px;
-                                    color: #cbd5e1;
+                                    color: root.text_secondary;
                                     wrap: word-wrap;
                                 }
                             }
@@ -727,21 +791,21 @@ export component AppWindow inherits Window {
                             text: "Type a keyword above to search indexed documents";
                             font-size: 14px;
                             font-weight: 500;
-                            color: #94a3b8;
+                            color: root.text_muted;
                             horizontal-alignment: center;
                         }
 
                         Text {
                             text: "💡 Supports: path:Dropbox, folder:Project, type:pdf, type:code, size:>1MB, size:<500KB";
                             font-size: 12px;
-                            color: #38bdf8;
+                            color: root.text_link;
                             horizontal-alignment: center;
                         }
 
                         Text {
                             text: "Use the '📁 Folders' button above to configure which directories to monitor.";
                             font-size: 12px;
-                            color: #64748b;
+                            color: root.text_muted;
                             horizontal-alignment: center;
                         }
                     }
@@ -758,14 +822,14 @@ export component AppWindow inherits Window {
                             text: "🔎 No matches found";
                             font-size: 15px;
                             font-weight: 600;
-                            color: #94a3b8;
+                            color: root.text_muted;
                             horizontal-alignment: center;
                         }
 
                         Text {
                             text: "Try searching for another term, or verify folders are indexed.";
                             font-size: 12px;
-                            color: #64748b;
+                            color: root.text_muted;
                             horizontal-alignment: center;
                         }
                     }

@@ -18,7 +18,7 @@ DocSearch indexes your local documents, PDFs, Word files, code, and scanned imag
 
 ## Key Features
 
-- **Native Slint Desktop GUI:** Fast, lightweight, GPU/software-rendered native desktop interface with responsive search-as-you-type, snippet highlighting, and dark mode.
+- **Native Slint Desktop GUI:** Fast, lightweight, GPU/software-rendered native desktop interface with responsive search-as-you-type, snippet highlighting, interactive Dark/Light theme changer, and automatic Day/Night theme selection (Light during the day, Dark at night).
 - **Native OS Folder Picker:** Uses the native operating system folder dialog (`rfd` / XDG Portal) to add directories directly without typing paths manually.
 - **Selective Folder Indexing:** Only scans and monitors folders you explicitly select. Does not index your entire drive or slow down your system.
 - **Large File Protection:** Automatically skips files exceeding the configured size limit (defaults to 25 MB, customizable via CLI, UI, or config; set to 0 for unlimited) to prevent memory spikes.
@@ -33,7 +33,7 @@ DocSearch indexes your local documents, PDFs, Word files, code, and scanned imag
   - **PDFs:** Digital text extraction via `pdftotext` with automatic fallback to OCR.
   - **Scanned Images (OCR):** Pluggable OCR interface supporting Tesseract for `.png`, `.jpg`, `.jpeg`, `.tiff`, `.bmp`, `.webp`.
 - **Dual Interface:**
-  - **Native Slint GUI:** Dark-themed search interface with live highlighted snippets, folder management drawer, and duplicate inspector.
+  - **Native Slint GUI:** Clean desktop interface with dark and light themes (auto day/night switching or manual toggle), live highlighted snippets, folder management drawer, and duplicate inspector.
   - **CLI Mode:** Instant search, directory management, duplicate reports, and status checks directly from your terminal.
 - **100% Offline & Private:** Zero telemetry, no cloud API keys, all data stays locally on your machine.
 - **MIT Licensed:** Free and open source.

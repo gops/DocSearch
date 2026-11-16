@@ -18,7 +18,7 @@ use slint::{ComponentHandle, ModelRc, VecModel};
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
-const VERSION: &str = "0.2.3";
+const VERSION: &str = "0.2.4";
 const BANNER: &str = r#"
   ___             ____                      _     
  |   \  ___  __  / ___|  ___  __ _ _ _ __ _| |_   
@@ -67,6 +67,8 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 };
                 println!("\nMax File Size Limit: {} (larger files skipped)", max_str);
                 println!("Indexing Pacing Delay: {} ms / file (gentle low I/O & CPU mode)", cfg.indexing_delay_ms);
+                let (_, theme_disp) = cfg.get_theme_display();
+                println!("Theme Mode: {} ({})", cfg.theme, theme_disp);
 
                 if let Ok(idx) = Indexer::open(&cfg.index_path) {
                     println!("Total Indexed Documents: {}\n", idx.doc_count());
@@ -193,7 +195,21 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Initialize UI properties
     update_folders_model(&main_window, &config_arc);
+    update_theme_state(&main_window, &config_arc);
     main_window.set_has_pdf_tool(extractor::pdf::is_pdf_extractor_available());
+
+    // Theme toggle callback
+    let cfg_theme = config_arc.clone();
+    let win_theme = window_weak.clone();
+    main_window.on_toggle_theme(move || {
+        let mut cfg = cfg_theme.write().unwrap();
+        cfg.cycle_theme();
+        let _ = cfg.save();
+        drop(cfg);
+        if let Some(win) = win_theme.upgrade() {
+            update_theme_state(&win, &cfg_theme);
+        }
+    });
 
     // Search query changed callback
     let idx_search = indexer.clone();
@@ -375,9 +391,10 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     });
 
-    // Status Timer: Periodically check indexing status
+    // Status Timer: Periodically check indexing status and auto day/night theme
     let crawler_timer = crawler.clone();
     let win_timer = window_weak.clone();
+    let cfg_timer = config_arc.clone();
     let timer = slint::Timer::default();
     timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(500), move || {
         let status = crawler_timer.get_status();
@@ -387,6 +404,16 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 win.set_status_text(format!("Indexing ({}/{} files)...", status.indexed_count, status.total_files).into());
             } else {
                 win.set_status_text("Idle".into());
+            }
+
+            // Periodic auto theme check for day/night transitions
+            let cfg = cfg_timer.read().unwrap();
+            if cfg.theme.eq_ignore_ascii_case("auto") {
+                let (expected_dark, _) = cfg.get_theme_display();
+                if win.get_is_dark() != expected_dark {
+                    drop(cfg);
+                    update_theme_state(&win, &cfg_timer);
+                }
             }
         }
     });
@@ -442,4 +469,12 @@ fn update_folders_model(win: &AppWindow, config: &Arc<RwLock<Config>>) {
     };
     win.set_folder_count(folders.len() as i32);
     win.set_folders(ModelRc::new(VecModel::from(folders)));
+}
+
+fn update_theme_state(win: &AppWindow, config: &Arc<RwLock<Config>>) {
+    let cfg = config.read().unwrap();
+    let (is_dark, button_text) = cfg.get_theme_display();
+    win.set_is_dark(is_dark);
+    win.set_theme_mode(cfg.theme.clone().into());
+    win.set_theme_button_text(button_text.into());
 }

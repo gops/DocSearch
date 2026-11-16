@@ -30,4 +30,43 @@ fn test_config_defaults_and_serialization() {
     assert_eq!(loaded.indexed_folders.len(), 1);
     assert_eq!(loaded.max_file_size_mb, 25);
     assert_eq!(loaded.indexing_delay_ms, 25);
+    assert_eq!(loaded.theme, "auto");
+}
+
+#[test]
+fn test_theme_day_night_and_cycling() {
+    let mut cfg = Config::default();
+    assert_eq!(cfg.theme, "auto");
+
+    // In auto mode, theme resolves based on daytime (6..18)
+    let is_day = Config::is_daytime();
+    assert_eq!(cfg.resolved_is_dark(), !is_day);
+
+    let (is_dark, display) = cfg.get_theme_display();
+    assert_eq!(is_dark, !is_day);
+    if is_day {
+        assert!(display.contains("Light (Auto)"));
+    } else {
+        assert!(display.contains("Dark (Auto)"));
+    }
+
+    // Force Dark
+    cfg.theme = "dark".to_string();
+    assert_eq!(cfg.resolved_is_dark(), true);
+    assert_eq!(cfg.get_theme_display(), (true, "🌙 Dark".to_string()));
+
+    // Force Light
+    cfg.theme = "light".to_string();
+    assert_eq!(cfg.resolved_is_dark(), false);
+    assert_eq!(cfg.get_theme_display(), (false, "☀️ Light".to_string()));
+
+    // Cycling
+    cfg.theme = "auto".to_string();
+    let next1 = cfg.cycle_theme();
+    let next2 = cfg.cycle_theme();
+    let next3 = cfg.cycle_theme();
+    assert_eq!(next3, "auto");
+    assert!(next1 == "dark" || next1 == "light");
+    assert!(next2 == "dark" || next2 == "light");
+    assert_ne!(next1, next2);
 }

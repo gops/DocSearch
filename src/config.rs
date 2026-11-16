@@ -1,3 +1,4 @@
+use chrono::Timelike;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -24,6 +25,8 @@ pub struct Config {
     pub file_extensions: Vec<String>,
     #[serde(default = "default_excluded_dirs")]
     pub excluded_dirs: Vec<String>,
+    #[serde(default = "default_theme")]
+    pub theme: String,
 
     #[serde(skip)]
     pub config_file_path: PathBuf,
@@ -78,6 +81,10 @@ fn default_excluded_dirs() -> Vec<String> {
     ]
 }
 
+fn default_theme() -> String {
+    "auto".to_string()
+}
+
 impl Default for Config {
     fn default() -> Self {
         let config_path = Self::default_config_path();
@@ -92,6 +99,7 @@ impl Default for Config {
             github_repo: default_github_repo(),
             file_extensions: default_file_extensions(),
             excluded_dirs: default_excluded_dirs(),
+            theme: default_theme(),
             config_file_path: config_path,
         }
     }
@@ -186,5 +194,65 @@ impl Config {
             return false;
         }
         size_bytes > self.max_file_size_mb * 1024 * 1024
+    }
+
+    pub fn is_daytime() -> bool {
+        let hour = chrono::Local::now().hour();
+        (6..18).contains(&hour)
+    }
+
+    pub fn resolved_is_dark(&self) -> bool {
+        match self.theme.to_lowercase().as_str() {
+            "dark" => true,
+            "light" => false,
+            _ => !Self::is_daytime(),
+        }
+    }
+
+    pub fn cycle_theme(&mut self) -> String {
+        let is_day = Self::is_daytime();
+        let next_theme = match self.theme.to_lowercase().as_str() {
+            "auto" => {
+                if is_day {
+                    "dark".to_string()
+                } else {
+                    "light".to_string()
+                }
+            }
+            "dark" => {
+                if is_day {
+                    "light".to_string()
+                } else {
+                    "auto".to_string()
+                }
+            }
+            "light" => {
+                if is_day {
+                    "auto".to_string()
+                } else {
+                    "dark".to_string()
+                }
+            }
+            _ => "auto".to_string(),
+        };
+        self.theme = next_theme.clone();
+        next_theme
+    }
+
+    pub fn get_theme_display(&self) -> (bool, String) {
+        let is_dark = self.resolved_is_dark();
+        let is_day = Self::is_daytime();
+        let display = match self.theme.to_lowercase().as_str() {
+            "dark" => "🌙 Dark".to_string(),
+            "light" => "☀️ Light".to_string(),
+            _ => {
+                if is_day {
+                    "☀️ Light (Auto)".to_string()
+                } else {
+                    "🌙 Dark (Auto)".to_string()
+                }
+            }
+        };
+        (is_dark, display)
     }
 }
