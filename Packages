@@ -98,3 +98,17 @@ Priority: optional
 Homepage: https://github.com/gops/DocSearch
 Description: Local cross-platform document search with native Slint GUI and Tantivy
 
+Package: docsearch
+Version: 0.2.5
+Architecture: amd64
+Maintainer: DocSearch Contributors <https://github.com/gops/DocSearch>
+Filename: ./docsearch_0.2.5_linux_amd64.deb
+Size: 11073868
+MD5sum: 87e75f27ff2d8e46e6e0dea097f5104d
+SHA1: e80a8fbcac0691bc398bae06e395a628d3464a90
+SHA256: 5e280cb5cc1ac0a3319a3eac09042fd9788528960d17b0ab429f64817d64959a
+Section: utils
+Priority: optional
+Homepage: https://github.com/gops/DocSearch
+Description: Local cross-platform document search with native Slint GUI and Tantivy
+
