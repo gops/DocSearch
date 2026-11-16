@@ -22,7 +22,10 @@ fn test_docx_extraction() {
 
 #[test]
 fn test_pdf_extraction() {
-    assert!(is_pdf_extractor_available());
+    if !is_pdf_extractor_available() {
+        eprintln!("[test_pdf_extraction] Skipping PDF extraction test: no pdftotext/gs found in PATH.");
+        return;
+    }
     let tools = get_available_pdf_tools();
     assert!(!tools.is_empty());
 

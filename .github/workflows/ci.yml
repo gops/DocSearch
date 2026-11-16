@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-22.04]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -21,7 +21,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libgl1-mesa-dev
+          sudo apt-get install -y libfontconfig1-dev libxkbcommon-dev libgl1-mesa-dev poppler-utils binutils
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -34,3 +34,17 @@ jobs:
 
       - name: Build binary
         run: cargo build --release --verbose
+
+      - name: Verify GLIBC compatibility
+        run: |
+          ALLOWED_MAX="2.35"
+          VERSIONS=$(objdump -p target/release/docsearch | grep -o 'GLIBC_[0-9.]*' | sed 's/GLIBC_//' | sort -uV)
+          echo "Detected GLIBC dependencies:"
+          echo "$VERSIONS"
+          for v in $VERSIONS; do
+            if [ "$(printf '%s\n%s' "$ALLOWED_MAX" "$v" | sort -V | tail -n1)" != "$ALLOWED_MAX" ]; then
+              echo "::error::Binary requires GLIBC_$v which is higher than allowed maximum GLIBC_$ALLOWED_MAX! This will break compatibility on user systems!"
+              exit 1
+            fi
+          done
+          echo "GLIBC compatibility verified: all symbol versions <= GLIBC_$ALLOWED_MAX."

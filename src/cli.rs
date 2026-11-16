@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
-#[command(name = "docsearch", version = "0.2.5", about = "Fast local document indexing & search with native Slint GUI")]
+#[command(name = "docsearch", version = "0.2.6", about = "Fast local document indexing & search with native Slint GUI")]
 pub struct Cli {
     #[arg(short, long, help = "Path to custom config JSON file")]
     pub config: Option<String>,
