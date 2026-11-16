@@ -1,20 +1,20 @@
 Architectures: amd64
 Codename: stable
 Components: main
-Date: Mon, 16 Nov 2026 07:35:22 +0000
+Date: Mon, 16 Nov 2026 07:59:15 +0000
 Description: DocSearch APT Repository
 Label: DocSearch
 Origin: DocSearch
 Suite: stable
 MD5Sum:
- 18038f3450c37e9d802a64b47355215d             4596 Packages
- e98ac2811bf85c38859d55511c937080             1262 Packages.gz
+ 31b5227101f9f6c9cdddd2323f559f81             5104 Packages
+ 2a1c009ecb6cc22effc9dbffb9523ec3             1360 Packages.gz
 SHA1:
- 26f26ae7a95ab1a66aed6074d55ce24289c4318f             4596 Packages
- fb21a5861f2fa75d16cfff65f3a66a634b05451c             1262 Packages.gz
+ b7a71e82d52a1b86bb8f21edc835d6ae4fdade8e             5104 Packages
+ 469ff2e9041b7b6211af82378843109ec762cdcc             1360 Packages.gz
 SHA256:
- c8d5f18f77883c16ae58ff14e5095aaccddede0acedd57cba2ea6ff3115411e4             4596 Packages
- b5196f3bc0069bea45b62d5547f6cc5ea0786f6cd44a73772b242c7c3c300da3             1262 Packages.gz
+ e1318179f23b8bda3f21272dfc68de66b12f32029aa0e7d4c5b0b392e4e92938             5104 Packages
+ 8b98c5e535760cf66594966347978ffdc0de1369759d977b9ed25fecaf9ddd2e             1360 Packages.gz
 SHA512:
- ddbc7d4f53e0bf340fbb60bcd50af4e784d50e1cf3ddab47e1ebe419fb035a52dfa8b9eeb80aaa554e15d888aa4fed3213629b40989dc6e36e7ba480e37e3e3f             4596 Packages
- 8f2405a8700f903884f461984666d30c4aef8ccb02f8ccc52803f638a3396f95d2ae6dc47aa2d5ee4f72f542fce041d61c0323dfd9fdaa3490efba64ff96bd4d             1262 Packages.gz
+ 33282032fc6b7ad2da8db6633be70488a17643e0e8b0907ebf3383e5d388d76e6664429331f10339924916760f35572e60c80b62ae8ea63d8b5d2137478a628b             5104 Packages
+ 6a3f9651b302a8b666acbb7fed2ee22d51f4d0fa48e090d4aad439a0221710be3cd0353b012d2adf44099cec5bb808549477a803cd22d434ac8fd01556a1a22b             1360 Packages.gz
