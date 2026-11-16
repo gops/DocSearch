@@ -2,6 +2,7 @@ slint::include_modules!();
 
 mod cli;
 mod config;
+mod crash;
 mod crawler;
 mod extractor;
 mod indexer;
@@ -18,7 +19,7 @@ use slint::{ComponentHandle, ModelRc, VecModel};
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
-const VERSION: &str = "0.2.7";
+const VERSION: &str = "0.2.8";
 const BANNER: &str = r#"
   ___             ____                      _     
  |   \  ___  __  / ___|  ___  __ _ _ _ __ _| |_   
@@ -28,6 +29,9 @@ const BANNER: &str = r#"
 "#;
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Install global crash handler to capture panic backtrace, log to file, and auto-restart
+    crash::init_crash_handler();
+
     let cli = Cli::parse();
 
     // Check if CLI subcommand was provided
@@ -113,6 +117,28 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                         println!("   [{}] {}", j + 1, f.path);
                     }
                     println!();
+                }
+            }
+            Commands::CrashLog { clear } => {
+                if clear {
+                    crash::clear_crash_log();
+                    println!("Crash log cleared.");
+                    return Ok(());
+                }
+
+                match crash::get_latest_crash_log() {
+                    Some(log) if !log.trim().is_empty() => {
+                        println!("\n=== DocSearch Crash Log ({}) ===\n", crash::crash_log_path().display());
+                        println!("{}", log);
+                        println!("============================================================");
+                        println!("💡 Tip: You can copy and paste the text above to report the crash.");
+                        if crash::copy_to_clipboard(&log) {
+                            println!("📋 (The crash log has also been automatically copied to your clipboard! Paste with Ctrl+V)");
+                        }
+                    }
+                    _ => {
+                        println!("\n✅ No crash log found at {}. DocSearch has not recorded any crashes.\n", crash::crash_log_path().display());
+                    }
                 }
             }
         }
@@ -203,6 +229,25 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     update_theme_state(&main_window, &config_arc);
     main_window.set_has_pdf_tool(extractor::pdf::is_pdf_extractor_available());
     main_window.set_update_available(startup_info.is_updated());
+    main_window.set_recovered_from_crash(cli.recovered_from_crash);
+
+    // Copy crash log callback
+    let win_crash = window_weak.clone();
+    main_window.on_copy_crash_log(move || {
+        let log_text = crash::get_latest_crash_log().unwrap_or_else(|| "No crash log recorded.".to_string());
+        let _ = crash::copy_to_clipboard(&log_text);
+        if let Some(win) = win_crash.upgrade() {
+            win.set_copy_log_button_text("✓ Copied to Clipboard!".into());
+        }
+    });
+
+    // Dismiss crash recovery banner callback
+    let win_dismiss = window_weak.clone();
+    main_window.on_dismiss_crash_recovery(move || {
+        if let Some(win) = win_dismiss.upgrade() {
+            win.set_recovered_from_crash(false);
+        }
+    });
 
     // Restart to apply update callback
     main_window.on_restart_to_update(|| {

@@ -1,13 +1,16 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
-#[command(name = "docsearch", version = "0.2.7", about = "Fast local document indexing & search with native Slint GUI")]
+#[command(name = "docsearch", version = "0.2.8", about = "Fast local document indexing & search with native Slint GUI")]
 pub struct Cli {
     #[arg(short, long, help = "Path to custom config JSON file")]
     pub config: Option<String>,
 
     #[arg(long, help = "Run in background daemon mode without opening GUI window")]
     pub headless: bool,
+
+    #[arg(long, help = "Internal flag indicating restart after crash recovery")]
+    pub recovered_from_crash: bool,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -33,4 +36,9 @@ pub enum Commands {
     Reindex,
     #[command(name = "duplicates", alias = "dupes", about = "Find and report duplicate files")]
     Duplicates,
+    #[command(name = "crash-log", about = "Display or manage the crash log from a recovered crash")]
+    CrashLog {
+        #[arg(short, long, help = "Clear the crash log")]
+        clear: bool,
+    },
 }

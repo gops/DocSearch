@@ -48,6 +48,8 @@ export component AppWindow inherits Window {
     callback delete_duplicate_file(string);
     callback toggle_theme();
     callback restart_to_update();
+    callback copy_crash_log();
+    callback dismiss_crash_recovery();
 
     // Properties bound from Rust
     in-out property <string> search_text: "";
@@ -58,6 +60,8 @@ export component AppWindow inherits Window {
     in-out property <int> folder_count: 0;
     in-out property <bool> has_pdf_tool: true;
     in-out property <bool> update_available: false;
+    in-out property <bool> recovered_from_crash: false;
+    in-out property <string> copy_log_button_text: "📋 Copy Crash Log";
 
     in-out property <bool> show_folders: false;
     in-out property <bool> show_duplicates: false;
@@ -138,7 +142,7 @@ export component AppWindow inherits Window {
                     y: (parent.height - self.height) / 2;
 
                     Text {
-                        text: "v0.2.7";
+                        text: "v0.2.8";
                         font-size: 11px;
                         font-weight: 600;
                         color: root.text_badge;
@@ -667,6 +671,95 @@ export component AppWindow inherits Window {
                             vertical-alignment: center;
                         }
                     }
+                }
+            }
+        }
+
+        // Crash Recovery Banner
+        if root.recovered_from_crash : Rectangle {
+            border-radius: 8px;
+            background: root.is_dark ? #451a03 : #fef3c7;
+            border-width: 1px;
+            border-color: root.is_dark ? #f59e0b : #fbbf24;
+
+            VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+
+                HorizontalLayout {
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Text {
+                            text: "⚠️ DocSearch automatically recovered from an unexpected crash!";
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: root.is_dark ? #fde68a : #92400e;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 8px;
+
+                        // Copy Crash Log Button
+                        Rectangle {
+                            border-radius: 6px;
+                            background: #f59e0b;
+                            height: 30px;
+                            y: (parent.height - self.height) / 2;
+
+                            TouchArea {
+                                clicked => {
+                                    root.copy_crash_log();
+                                }
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                Text {
+                                    text: root.copy_log_button_text;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    color: #1c1917;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        // Dismiss Button
+                        Rectangle {
+                            border-radius: 6px;
+                            background: root.bg_btn_clear;
+                            height: 30px;
+                            y: (parent.height - self.height) / 2;
+
+                            TouchArea {
+                                clicked => {
+                                    root.dismiss_crash_recovery();
+                                }
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                Text {
+                                    text: "✕ Dismiss";
+                                    font-size: 12px;
+                                    color: root.text_muted;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Text {
+                    text: "Crash log saved to ~/.config/docsearch/crash.log. Click 'Copy Crash Log' above and paste it in chat.";
+                    font-size: 12px;
+                    color: root.is_dark ? #fcd34d : #78350f;
                 }
             }
         }
