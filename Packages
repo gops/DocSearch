@@ -1,20 +1,5 @@
 Package: docsearch
 Version: 0.1.5
-Architecture: amd64
-Maintainer: DocSearch Contributors <https://github.com/gops/DocSearch>
-Installed-Size: 12383
-Filename: ./docsearch_0.1.5_linux_amd64.deb
-Size: 5184212
-MD5sum: 99efa4e541e999c731512eb10a7bd429
-SHA1: 21c7e8879f5736cd7db5887cf67e59a5d76710ff
-SHA256: 8db781c8b7c5f90751109acbd6b3da4911f13fdc54555e394ea11258c04a2f46
-Section: utils
-Priority: optional
-Homepage: https://github.com/gops/DocSearch
-Description: Local cross-platform document search with OCR and system tray
-
-Package: docsearch
-Version: 0.1.5
 Architecture: arm64
 Maintainer: DocSearch Contributors <https://github.com/gops/DocSearch>
 Installed-Size: 11523
@@ -23,6 +8,21 @@ Size: 4676312
 MD5sum: e3c903b091091bc36c2e90b3435cfea0
 SHA1: 3473094d5a809ecb36bb609b03a4be579b03ab40
 SHA256: 3582e60f44eba2b9a042fa520db5be64c2a7e80e0ba9f72687f87482e2840c5a
+Section: utils
+Priority: optional
+Homepage: https://github.com/gops/DocSearch
+Description: Local cross-platform document search with OCR and system tray
+
+Package: docsearch
+Version: 0.1.5
+Architecture: amd64
+Maintainer: DocSearch Contributors <https://github.com/gops/DocSearch>
+Installed-Size: 12383
+Filename: ./docsearch_0.1.5_linux_amd64.deb
+Size: 5184212
+MD5sum: 99efa4e541e999c731512eb10a7bd429
+SHA1: 21c7e8879f5736cd7db5887cf67e59a5d76710ff
+SHA256: 8db781c8b7c5f90751109acbd6b3da4911f13fdc54555e394ea11258c04a2f46
 Section: utils
 Priority: optional
 Homepage: https://github.com/gops/DocSearch
@@ -79,6 +79,20 @@ Size: 11124512
 MD5sum: 366da8fe94b7db973284a2ca633718a7
 SHA1: de002e8bc2acbcc36e3e6cdd072443dbb1938055
 SHA256: 48546aff4a3e7eba9258a12a6b853fba50dc43d3c08d8908622290335feabd07
+Section: utils
+Priority: optional
+Homepage: https://github.com/gops/DocSearch
+Description: Local cross-platform document search with native Slint GUI and Tantivy
+
+Package: docsearch
+Version: 0.2.4
+Architecture: amd64
+Maintainer: DocSearch Contributors <https://github.com/gops/DocSearch>
+Filename: ./docsearch_0.2.4_linux_amd64.deb
+Size: 11066554
+MD5sum: b1b8f8d5adfa2dd682f285294a06f914
+SHA1: 50da823e9a4d697d54101598efbe44e7492cb5f3
+SHA256: 0dff0d2d2c5abcc3dba4c1dde9b4501ad31d31aa1aecfe2e37dccb9b0690d730
 Section: utils
 Priority: optional
 Homepage: https://github.com/gops/DocSearch
