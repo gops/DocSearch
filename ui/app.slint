@@ -47,6 +47,7 @@ export component AppWindow inherits Window {
     callback show_in_folder(string);
     callback delete_duplicate_file(string);
     callback toggle_theme();
+    callback restart_to_update();
 
     // Properties bound from Rust
     in-out property <string> search_text: "";
@@ -56,6 +57,7 @@ export component AppWindow inherits Window {
     in-out property <bool> has_results: false;
     in-out property <int> folder_count: 0;
     in-out property <bool> has_pdf_tool: true;
+    in-out property <bool> update_available: false;
 
     in-out property <bool> show_folders: false;
     in-out property <bool> show_duplicates: false;
@@ -136,7 +138,7 @@ export component AppWindow inherits Window {
                     y: (parent.height - self.height) / 2;
 
                     Text {
-                        text: "v0.2.6";
+                        text: "v0.2.7";
                         font-size: 11px;
                         font-weight: 600;
                         color: root.text_badge;
@@ -150,6 +152,33 @@ export component AppWindow inherits Window {
             HorizontalLayout {
                 spacing: 10px;
                 alignment: end;
+
+                // Restart to Apply Update Header Button
+                if root.update_available : Rectangle {
+                    border-radius: 6px;
+                    background: #16a34a;
+                    height: 32px;
+                    y: (parent.height - self.height) / 2;
+
+                    TouchArea {
+                        clicked => {
+                            root.restart_to_update();
+                        }
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        spacing: 6px;
+                        Text {
+                            text: "🚀 Restart to Update";
+                            font-size: 13px;
+                            font-weight: 600;
+                            color: #ffffff;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
 
                 // Status Pill
                 Rectangle {
@@ -593,6 +622,55 @@ export component AppWindow inherits Window {
             }
         }
 
+        // Update Available Notification Banner
+        if root.update_available : Rectangle {
+            height: 42px;
+            border-radius: 8px;
+            background: root.is_dark ? #14532d : #dcfce7;
+            border-width: 1px;
+            border-color: root.is_dark ? #22c55e : #86efac;
+
+            HorizontalLayout {
+                padding-left: 14px;
+                padding-right: 14px;
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    Text {
+                        text: "🚀 DocSearch update is ready! Restart to apply the latest version.";
+                        font-size: 13px;
+                        font-weight: 600;
+                        color: root.is_dark ? #86efac : #166534;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Rectangle {
+                    border-radius: 6px;
+                    background: #16a34a;
+                    height: 28px;
+                    y: (parent.height - self.height) / 2;
+
+                    TouchArea {
+                        clicked => { root.restart_to_update(); }
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        Text {
+                            text: "Restart Now";
+                            font-size: 12px;
+                            font-weight: 600;
+                            color: #ffffff;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+
         // PDF tool tip banner (shown only if no PDF extractor is installed)
         if !root.has_pdf_tool : Rectangle {
             height: 30px;
@@ -626,6 +704,10 @@ export component AppWindow inherits Window {
                     background: root.bg_card;
                     border-width: 1px;
                     border-color: root.border_card;
+
+                    TouchArea {
+                        clicked => { root.open_file(item.path); }
+                    }
 
                     VerticalLayout {
                         padding: 12px;

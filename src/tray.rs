@@ -211,8 +211,13 @@ impl Tray for DocSearchTray {
     }
 }
 
+#[allow(dead_code)]
 pub fn spawn_tray(sender: Sender<TrayAction>) {
     let startup_info = StartupBinaryInfo::record();
+    spawn_tray_with_info(sender, startup_info);
+}
+
+pub fn spawn_tray_with_info(sender: Sender<TrayAction>, startup_info: StartupBinaryInfo) {
     let tray = DocSearchTray {
         sender,
         startup_info,

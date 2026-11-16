@@ -18,7 +18,7 @@ use slint::{ComponentHandle, ModelRc, VecModel};
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
-const VERSION: &str = "0.2.6";
+const VERSION: &str = "0.2.7";
 const BANNER: &str = r#"
   ___             ____                      _     
  |   \  ___  __  / ___|  ___  __ _ _ _ __ _| |_   
@@ -168,8 +168,9 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     });
 
     // Setup system tray
+    let startup_info = tray::StartupBinaryInfo::record();
     let (tray_tx, tray_rx) = crossbeam_channel::unbounded();
-    tray::spawn_tray(tray_tx.clone());
+    tray::spawn_tray_with_info(tray_tx.clone(), startup_info.clone());
 
     if cli.headless {
         eprintln!("[Init] Running in headless daemon mode. Press Ctrl+C to stop.");
@@ -201,6 +202,13 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     update_folders_model(&main_window, &config_arc);
     update_theme_state(&main_window, &config_arc);
     main_window.set_has_pdf_tool(extractor::pdf::is_pdf_extractor_available());
+    main_window.set_update_available(startup_info.is_updated());
+
+    // Restart to apply update callback
+    main_window.on_restart_to_update(|| {
+        eprintln!("[GUI] Restart to apply update clicked. Relaunching DocSearch...");
+        tray::restart_application();
+    });
 
     // Theme toggle callback
     let cfg_theme = config_arc.clone();
@@ -395,10 +403,11 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         }
     });
 
-    // Status Timer: Periodically check indexing status and auto day/night theme
+    // Status Timer: Periodically check indexing status, update availability, and auto day/night theme
     let crawler_timer = crawler.clone();
     let win_timer = window_weak.clone();
     let cfg_timer = config_arc.clone();
+    let info_timer = startup_info.clone();
     let timer = slint::Timer::default();
     timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(500), move || {
         let status = crawler_timer.get_status();
@@ -408,6 +417,12 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 win.set_status_text(format!("Indexing ({}/{} files)...", status.indexed_count, status.total_files).into());
             } else {
                 win.set_status_text("Idle".into());
+            }
+
+            // Periodic check for binary update on disk
+            let is_up = info_timer.is_updated();
+            if win.get_update_available() != is_up {
+                win.set_update_available(is_up);
             }
 
             // Periodic auto theme check for day/night transitions
