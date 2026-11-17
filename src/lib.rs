@@ -1,7 +1,9 @@
+pub mod autostart;
 pub mod cli;
 pub mod config;
 pub mod crash;
 pub mod crawler;
 pub mod extractor;
 pub mod indexer;
+pub mod single_instance;
 pub mod tray;

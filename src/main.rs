@@ -1,11 +1,13 @@
 slint::include_modules!();
 
+mod autostart;
 mod cli;
 mod config;
 mod crash;
 mod crawler;
 mod extractor;
 mod indexer;
+mod single_instance;
 mod tray;
 
 use clap::Parser;
@@ -19,7 +21,7 @@ use slint::{ComponentHandle, ModelRc, VecModel};
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 
-const VERSION: &str = "0.2.8";
+const VERSION: &str = "0.2.9";
 const BANNER: &str = r#"
   ___             ____                      _     
  |   \  ___  __  / ___|  ___  __ _ _ _ __ _| |_   
@@ -28,7 +30,29 @@ const BANNER: &str = r#"
   Local Cross-Platform Document Search Engine (Rust + Slint Native GUI)
 "#;
 
+fn sanitize_locale() {
+    #[cfg(unix)]
+    {
+        for key in ["LANG", "LC_ALL", "LC_CTYPE"] {
+            if let Ok(val) = std::env::var(key) {
+                let trimmed = val.trim();
+                if !trimmed.is_empty()
+                    && !trimmed.eq_ignore_ascii_case("c")
+                    && !trimmed.eq_ignore_ascii_case("posix")
+                    && !trimmed.to_lowercase().contains("utf")
+                {
+                    let fixed = format!("{}.UTF-8", trimmed);
+                    std::env::set_var(key, &fixed);
+                }
+            }
+        }
+    }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    // Sanitize locale encoding to avoid xkbcommon compose table warnings (e.g. LANG=en_IN without .UTF-8)
+    sanitize_locale();
+
     // Install global crash handler to capture panic backtrace, log to file, and auto-restart
     crash::init_crash_handler();
 
@@ -39,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let cfg = Config::load(cli.config.as_deref())?;
         match cmd {
             Commands::Search { query, limit } => {
-                let idx = Indexer::open(&cfg.index_path)?;
+                let idx = Indexer::open_read_only(&cfg.index_path)?;
                 let res = idx.search(&query, limit)?;
                 println!("\nFound {} matches for \"{}\" in {} ms:\n", res.total_hits, query, res.duration_ms);
                 for (i, hit) in res.items.iter().enumerate() {
@@ -73,12 +97,33 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 println!("Indexing Pacing Delay: {} ms / file (gentle low I/O & CPU mode)", cfg.indexing_delay_ms);
                 let (_, theme_disp) = cfg.get_theme_display();
                 println!("Theme Mode: {} ({})", cfg.theme, theme_disp);
+                let autostart_disp = if autostart::is_autostart_enabled() {
+                    "Enabled (Active)"
+                } else {
+                    "Disabled"
+                };
+                println!("System Auto-Start: {}", autostart_disp);
 
-                if let Ok(idx) = Indexer::open(&cfg.index_path) {
+                if let Ok(idx) = Indexer::open_read_only(&cfg.index_path) {
                     println!("Total Indexed Documents: {}\n", idx.doc_count());
                 }
             }
             Commands::Reindex => {
+                // If a background daemon or GUI instance is active, delegate re-scan via IPC
+                if let Ok(mut client) = single_instance::connect_client(&cfg.index_path) {
+                    println!("[DocSearch] Active DocSearch background service detected.");
+                    println!("[DocSearch] Triggering re-index via single-instance IPC...");
+                    match client.send_action("RESCAN") {
+                        Ok(_) => {
+                            println!("✅ Re-indexing triggered on running DocSearch instance.");
+                            return Ok(());
+                        }
+                        Err(e) => {
+                            eprintln!("[DocSearch] Could not signal running service ({}). Falling back to direct reindex...", e);
+                        }
+                    }
+                }
+
                 let idx = Arc::new(Indexer::open(&cfg.index_path)?);
                 let ext = Arc::new(ExtractorManager::new(cfg.ocr_enabled, cfg.ocr_command.clone()));
                 let config_arc = Arc::new(RwLock::new(cfg));
@@ -88,7 +133,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 println!("Re-indexing complete. Current total documents: {}", idx.doc_count());
             }
             Commands::Duplicates => {
-                let idx = Indexer::open(&cfg.index_path)?;
+                let idx = Indexer::open_read_only(&cfg.index_path)?;
                 let report = idx.find_duplicates()?;
 
                 if report.total_groups == 0 {
@@ -141,6 +186,48 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     }
                 }
             }
+            Commands::Autostart { enable, disable, status: _ } => {
+                if enable {
+                    match autostart::enable_autostart() {
+                        Ok(_) => {
+                            let mut cfg = cfg;
+                            cfg.autostart = true;
+                            let _ = cfg.save();
+                            println!("✅ Successfully enabled DocSearch auto-start on system boot.");
+                            if let Ok(path) = autostart::get_autostart_desktop_path() {
+                                println!("   Autostart entry: {}", path.display());
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("❌ Failed to enable auto-start: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                } else if disable {
+                    match autostart::disable_autostart() {
+                        Ok(_) => {
+                            let mut cfg = cfg;
+                            cfg.autostart = false;
+                            let _ = cfg.save();
+                            println!("✅ Successfully disabled DocSearch auto-start on system boot.");
+                        }
+                        Err(e) => {
+                            eprintln!("❌ Failed to disable auto-start: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                } else {
+                    let enabled = autostart::is_autostart_enabled();
+                    println!(
+                        "\nDocSearch System Auto-Start: {}\n",
+                        if enabled { "Enabled (Active) ✅" } else { "Disabled ❌" }
+                    );
+                    if let Ok(path) = autostart::get_autostart_desktop_path() {
+                        println!("Desktop entry file: {}", path.display());
+                    }
+                    println!("\nUsage: docsearch autostart --enable | --disable | --status\n");
+                }
+            }
         }
         return Ok(());
     }
@@ -151,6 +238,29 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     let config = Config::load(cli.config.as_deref())?;
     let config_arc = Arc::new(RwLock::new(config.clone()));
+
+    // Single-instance activation check:
+    // If an instance is already running for this index, request window activation and exit cleanly.
+    let single_instance_server = match single_instance::check_or_bind(&config.index_path) {
+        Ok(single_instance::InstanceStatus::AlreadyRunning(mut client)) => {
+            eprintln!("[DocSearch] An instance is already running for index directory: {}", config.index_path);
+            eprintln!("[DocSearch] Activating and bringing existing window into focus...");
+            if let Err(e) = client.send_action("SHOW") {
+                eprintln!("[DocSearch] Notice: Failed to deliver activation signal: {}", e);
+            } else {
+                eprintln!("[DocSearch] Successfully activated running instance. Exiting.");
+            }
+            return Ok(());
+        }
+        Ok(single_instance::InstanceStatus::Primary(server)) => {
+            eprintln!("[DocSearch] Single-instance lock acquired (primary instance).");
+            Some(server)
+        }
+        Err(e) => {
+            eprintln!("[DocSearch] Warning: Single-instance IPC check failed ({}), continuing startup...", e);
+            None
+        }
+    };
 
     let indexer = Arc::new(Indexer::open(&config.index_path)?);
     let extractor = Arc::new(ExtractorManager::new(config.ocr_enabled, config.ocr_command.clone()));
@@ -198,10 +308,29 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let (tray_tx, tray_rx) = crossbeam_channel::unbounded();
     tray::spawn_tray_with_info(tray_tx.clone(), startup_info.clone());
 
+    // Setup single-instance IPC listener on the primary instance
+    let _instance_guard = if let Some(server) = single_instance_server {
+        let tx = tray_tx.clone();
+        Some(server.start_listener(move |action| match action {
+            "SHOW" => {
+                let _ = tx.send(tray::TrayAction::ShowWindow);
+            }
+            "RESCAN" => {
+                let _ = tx.send(tray::TrayAction::Rescan);
+            }
+            _ => {}
+        }))
+    } else {
+        None
+    };
+
     if cli.headless {
         eprintln!("[Init] Running in headless daemon mode. Press Ctrl+C to stop.");
         while let Ok(action) = tray_rx.recv() {
             match action {
+                tray::TrayAction::ShowWindow => {
+                    eprintln!("[Daemon] Received activation request via IPC (running headless).");
+                }
                 tray::TrayAction::Rescan => {
                     let c = crawler.clone();
                     std::thread::spawn(move || c.scan_all());
@@ -214,7 +343,21 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     eprintln!("[Restart] Restart requested from system tray in daemon mode...");
                     tray::restart_application();
                 }
-                _ => {}
+                tray::TrayAction::ToggleAutostart => {
+                    let new_state = match autostart::toggle_autostart() {
+                        Ok(s) => {
+                            eprintln!("[Daemon] Auto-start toggled via tray: {}", if s { "ENABLED" } else { "DISABLED" });
+                            s
+                        }
+                        Err(e) => {
+                            eprintln!("[Daemon] Failed to toggle auto-start: {}", e);
+                            autostart::is_autostart_enabled()
+                        }
+                    };
+                    let mut cfg = config_arc.write().unwrap();
+                    cfg.autostart = new_state;
+                    let _ = cfg.save();
+                }
             }
         }
         return Ok(());
@@ -230,6 +373,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     main_window.set_has_pdf_tool(extractor::pdf::is_pdf_extractor_available());
     main_window.set_update_available(startup_info.is_updated());
     main_window.set_recovered_from_crash(cli.recovered_from_crash);
+    main_window.set_autostart_enabled(autostart::is_autostart_enabled());
 
     // Copy crash log callback
     let win_crash = window_weak.clone();
@@ -265,6 +409,30 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         drop(cfg);
         if let Some(win) = win_theme.upgrade() {
             update_theme_state(&win, &cfg_theme);
+        }
+    });
+
+    // Auto-start toggle callback
+    let cfg_autostart = config_arc.clone();
+    let win_autostart = window_weak.clone();
+    main_window.on_toggle_autostart(move || {
+        let new_state = match autostart::toggle_autostart() {
+            Ok(s) => {
+                eprintln!("[GUI] Auto-start toggled: {}", if s { "ENABLED" } else { "DISABLED" });
+                s
+            }
+            Err(e) => {
+                eprintln!("[GUI] Failed to toggle auto-start: {}", e);
+                autostart::is_autostart_enabled()
+            }
+        };
+        let mut cfg = cfg_autostart.write().unwrap();
+        cfg.autostart = new_state;
+        let _ = cfg.save();
+        drop(cfg);
+
+        if let Some(win) = win_autostart.upgrade() {
+            win.set_autostart_enabled(new_state);
         }
     });
 
@@ -501,6 +669,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                             if let Some(w) = win.upgrade() {
                                 let _ = w.show();
                                 w.window().set_minimized(false);
+                                w.window().request_redraw();
                             }
                         }
                     });
@@ -517,12 +686,39 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                     eprintln!("[Shutdown] Quit requested from system tray. Terminating DocSearch...");
                     std::process::exit(0);
                 }
+                tray::TrayAction::ToggleAutostart => {
+                    let new_state = match autostart::toggle_autostart() {
+                        Ok(s) => {
+                            eprintln!("[Tray] Auto-start toggled: {}", if s { "ENABLED" } else { "DISABLED" });
+                            s
+                        }
+                        Err(e) => {
+                            eprintln!("[Tray] Failed to toggle auto-start: {}", e);
+                            autostart::is_autostart_enabled()
+                        }
+                    };
+                    let mut cfg = config_arc.write().unwrap();
+                    cfg.autostart = new_state;
+                    let _ = cfg.save();
+                    drop(cfg);
+
+                    let win = win_tray.clone();
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(w) = win.upgrade() {
+                            w.set_autostart_enabled(new_state);
+                        }
+                    });
+                }
             }
         }
     });
 
-    // Show window initially and run event loop until explicit quit from system tray
-    main_window.show()?;
+    // Show window initially unless --minimized was passed (e.g. system boot auto-start)
+    if !cli.minimized {
+        main_window.show()?;
+    } else {
+        eprintln!("[Init] Started minimized to system tray via --minimized.");
+    }
     slint::run_event_loop_until_quit()?;
     Ok(())
 }

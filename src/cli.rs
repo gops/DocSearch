@@ -1,13 +1,16 @@
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
-#[command(name = "docsearch", version = "0.2.8", about = "Fast local document indexing & search with native Slint GUI")]
+#[command(name = "docsearch", version = "0.2.9", about = "Fast local document indexing & search with native Slint GUI")]
 pub struct Cli {
     #[arg(short, long, help = "Path to custom config JSON file")]
     pub config: Option<String>,
 
     #[arg(long, help = "Run in background daemon mode without opening GUI window")]
     pub headless: bool,
+
+    #[arg(long, help = "Start minimized to system tray without displaying main window")]
+    pub minimized: bool,
 
     #[arg(long, help = "Internal flag indicating restart after crash recovery")]
     pub recovered_from_crash: bool,
@@ -40,5 +43,14 @@ pub enum Commands {
     CrashLog {
         #[arg(short, long, help = "Clear the crash log")]
         clear: bool,
+    },
+    #[command(name = "autostart", about = "Configure or inspect system startup (auto-start)")]
+    Autostart {
+        #[arg(long, help = "Enable automatic start on system boot / login")]
+        enable: bool,
+        #[arg(long, help = "Disable automatic start on system boot / login")]
+        disable: bool,
+        #[arg(long, help = "Query current auto-start status")]
+        status: bool,
     },
 }

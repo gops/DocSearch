@@ -24,6 +24,8 @@ DocSearch indexes your local documents, PDFs, Word files, code, and scanned imag
 - **Large File Protection:** Automatically skips files exceeding the configured size limit (defaults to 25 MB, customizable via CLI, UI, or config; set to 0 for unlimited) to prevent memory spikes.
 - **Duplicate Document Detection:** Cryptographic SHA-256 content hashing instantly finds duplicate documents across all monitored directories, calculates wasted disk space, and lets you open or remove redundant copies via CLI and UI.
 - **System Tray Daemon & Seamless Restart on Update:** Sits in your OS system tray (StatusNotifierItem / SNI on Linux, Windows, macOS) with quick access to search, folder re-scans, and application exit. When DocSearch is updated (e.g. via package upgrade or binary replacement), right-clicking the tray icon dynamically presents **"🚀 Restart to Apply Update"** to cleanly relaunch the new version.
+- **Single-Instance Window Activation:** Launching DocSearch while an instance is already active or minimized to tray automatically signals and unminimizes the existing window into focus via local IPC without Tantivy lock contention.
+- **System Boot Auto-Start:** Easily configure DocSearch to launch automatically on system login (minimized to system tray) with a single click in the GUI header, system tray menu, or CLI (`docsearch autostart --enable`).
 - **Crash Auto-Recovery & Diagnostic Logging:** Global panic handler automatically intercepts unexpected crashes, saves a full stack backtrace and diagnostic report to `~/.config/docsearch/crash.log`, and cleanly auto-restarts the application with a one-click **"📋 Copy Crash Log"** button (or CLI `docsearch crash-log`) for seamless issue reporting.
 - **Pure Rust Search Core:** Powered by [Tantivy](https://github.com/quickwit-oss/tantivy) for embedded, high-performance BM25 full-text indexing, field boosting, and snippet highlighting.
 - **Real-Time Live Watching:** Integrated [`notify`](https://github.com/notify-rs/notify) detects file creations, edits, and deletions instantly with debouncing.
@@ -52,11 +54,14 @@ DocSearch
 ├── src/
 │   ├── main.rs            # Application entry point, Slint bindings, & CLI dispatch
 │   ├── lib.rs             # Core library exports
+│   ├── autostart.rs       # System boot auto-start manager (XDG desktop autostart)
 │   ├── config.rs          # JSON configuration management & folder tracking
 │   ├── cli.rs             # Clap CLI command line parser
-│   ├── indexer/           # Tantivy search engine, BM25 ranking, & duplicate scanner
+│   ├── crash.rs           # Crash interceptor & backtrace diagnostic logging
 │   ├── crawler/           # Directory walker, live notify watcher, & SHA-256 hashing
 │   ├── extractor/         # Text, DOCX, PDF, and OCR parsers
+│   ├── indexer/           # Tantivy search engine, BM25 ranking, & duplicate scanner
+│   ├── single_instance.rs # Local IPC single-instance socket guard & window activation
 │   └── tray.rs            # Background system tray daemon (ksni)
 ├── test_docs/             # Sample documents for verification
 ├── tests/                 # Integration test suites (extractors, indexer, config)

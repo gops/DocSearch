@@ -8,6 +8,7 @@ pub enum TrayAction {
     Rescan,
     Restart,
     Quit,
+    ToggleAutostart,
 }
 
 #[derive(Clone, Debug)]
@@ -190,6 +191,25 @@ impl Tray for DocSearchTray {
                 label: "🔄 Re-scan Folders".into(),
                 activate: Box::new(move |_| {
                     let _ = tx_rescan.send(TrayAction::Rescan);
+                }),
+                ..Default::default()
+            }
+            .into(),
+        );
+        items.push(MenuItem::Separator);
+
+        let tx_autostart = self.sender.clone();
+        let autostart_enabled = crate::autostart::is_autostart_enabled();
+        let autostart_label = if autostart_enabled {
+            "✓ Start at Login (Auto-start)".to_string()
+        } else {
+            "Start at Login (Auto-start)".to_string()
+        };
+        items.push(
+            StandardItem {
+                label: autostart_label,
+                activate: Box::new(move |_| {
+                    let _ = tx_autostart.send(TrayAction::ToggleAutostart);
                 }),
                 ..Default::default()
             }

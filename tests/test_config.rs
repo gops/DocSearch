@@ -31,6 +31,7 @@ fn test_config_defaults_and_serialization() {
     assert_eq!(loaded.max_file_size_mb, 25);
     assert_eq!(loaded.indexing_delay_ms, 25);
     assert_eq!(loaded.theme, "auto");
+    assert_eq!(loaded.autostart, false);
 }
 
 #[test]

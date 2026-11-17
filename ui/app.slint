@@ -47,6 +47,7 @@ export component AppWindow inherits Window {
     callback show_in_folder(string);
     callback delete_duplicate_file(string);
     callback toggle_theme();
+    callback toggle_autostart();
     callback restart_to_update();
     callback copy_crash_log();
     callback dismiss_crash_recovery();
@@ -75,6 +76,7 @@ export component AppWindow inherits Window {
     in-out property <bool> is_dark: true;
     in-out property <string> theme_mode: "auto";
     in-out property <string> theme_button_text: "🌓 Auto";
+    in-out property <bool> autostart_enabled: false;
 
     // Theme palette
     property <color> bg_window: root.is_dark ? #11141c : #f8fafc;
@@ -142,7 +144,7 @@ export component AppWindow inherits Window {
                     y: (parent.height - self.height) / 2;
 
                     Text {
-                        text: "v0.2.8";
+                        text: "v0.2.9";
                         font-size: 11px;
                         font-weight: 600;
                         color: root.text_badge;
@@ -239,6 +241,35 @@ export component AppWindow inherits Window {
                             font-size: 13px;
                             font-weight: 500;
                             color: root.text_primary;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // Auto-start Toggle Button
+                Rectangle {
+                    border-radius: 6px;
+                    background: root.autostart_enabled ? (root.is_dark ? #132e22 : #ecfdf5) : root.bg_btn_nav;
+                    border-width: 1px;
+                    border-color: root.autostart_enabled ? (root.is_dark ? #059669 : #10b981) : root.border_btn;
+                    height: 32px;
+                    y: (parent.height - self.height) / 2;
+
+                    TouchArea {
+                        clicked => {
+                            root.toggle_autostart();
+                        }
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 4px;
+                        Text {
+                            text: root.autostart_enabled ? "🚀 Auto-start: ON" : "🚀 Auto-start: OFF";
+                            font-size: 13px;
+                            font-weight: 500;
+                            color: root.autostart_enabled ? (root.is_dark ? #34d399 : #059669) : root.text_muted;
                             vertical-alignment: center;
                         }
                     }

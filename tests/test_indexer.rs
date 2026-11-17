@@ -171,3 +171,46 @@ fn test_query_preprocessing() {
         "size:[1048576 TO 5242880] report"
     );
 }
+
+#[test]
+fn test_concurrent_read_only_access_with_active_writer() {
+    let temp_dir = TempDir::new().unwrap();
+
+    // 1. Open primary indexer holding the exclusive writer lock
+    let idx_writer = Indexer::open(temp_dir.path()).unwrap();
+    assert!(!idx_writer.is_read_only());
+
+    idx_writer
+        .index_document(
+            "/test/readme.md",
+            "readme.md",
+            ".md",
+            120,
+            1700000000,
+            "hash_md",
+            false,
+            "Documentation for DocSearch single-instance mode",
+        )
+        .unwrap();
+    idx_writer.commit().unwrap();
+
+    // 2. Open read-only indexer on the SAME directory while writer is still active
+    let idx_reader = Indexer::open_read_only(temp_dir.path())
+        .expect("Read-only indexer should open concurrently without LockBusy error");
+    assert!(idx_reader.is_read_only());
+    assert_eq!(idx_reader.doc_count(), 1);
+
+    let res = idx_reader.search("single-instance", 5).unwrap();
+    assert_eq!(res.total_hits, 1);
+    assert_eq!(res.items[0].filename, "readme.md");
+
+    // 3. Attempting another read-write open on the same dir should fail gracefully with lock error
+    let second_writer_res = Indexer::open(temp_dir.path());
+    assert!(second_writer_res.is_err(), "Second writer must fail due to lock contention");
+    let err_msg = second_writer_res.err().unwrap().to_string();
+    assert!(
+        err_msg.contains("Failed to acquire index write lock"),
+        "Error message should explain write lock failure clearly: {}",
+        err_msg
+    );
+}

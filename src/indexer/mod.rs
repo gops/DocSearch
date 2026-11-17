@@ -48,30 +48,61 @@ pub struct Indexer {
 
     index: Index,
     reader: IndexReader,
-    writer: Arc<Mutex<IndexWriter>>,
+    writer: Option<Arc<Mutex<IndexWriter>>>,
+}
+
+struct IndexFields {
+    raw_path: Field,
+    path: Field,
+    filename: Field,
+    ext: Field,
+    size: Field,
+    mod_time: Field,
+    hash: Field,
+    is_ocr: Field,
+    content: Field,
 }
 
 impl Indexer {
+    fn build_schema() -> (Schema, IndexFields) {
+        let mut schema_builder = Schema::builder();
+        // raw_path is untokenized STRING for unique ID, exact deletion, and hash lookup
+        let raw_path = schema_builder.add_text_field("raw_path", STRING | STORED);
+        // path is tokenized TEXT so folder names and path keywords can be searched
+        let path = schema_builder.add_text_field("path", TEXT | STORED);
+        // filename is tokenized TEXT
+        let filename = schema_builder.add_text_field("filename", TEXT | STORED);
+        // ext is tokenized TEXT so both 'pdf' and '.pdf' match
+        let ext = schema_builder.add_text_field("ext", TEXT | STORED);
+        // size is indexed i64 for range queries
+        let size = schema_builder.add_i64_field("size", STORED | INDEXED | FAST);
+        // mod_time is indexed i64 for date range queries
+        let mod_time = schema_builder.add_i64_field("mod_time", STORED | INDEXED | FAST);
+        let hash = schema_builder.add_text_field("hash", STRING | STORED);
+        let is_ocr = schema_builder.add_text_field("is_ocr", STRING | STORED);
+        let content = schema_builder.add_text_field("content", TEXT | STORED);
+        let schema = schema_builder.build();
+
+        (
+            schema,
+            IndexFields {
+                raw_path,
+                path,
+                filename,
+                ext,
+                size,
+                mod_time,
+                hash,
+                is_ocr,
+                content,
+            },
+        )
+    }
+
     pub fn open<P: AsRef<Path>>(index_dir: P) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         fs::create_dir_all(index_dir.as_ref())?;
 
-        let mut schema_builder = Schema::builder();
-        // raw_path is untokenized STRING for unique ID, exact deletion, and hash lookup
-        let raw_path_field = schema_builder.add_text_field("raw_path", STRING | STORED);
-        // path is tokenized TEXT so folder names and path keywords can be searched
-        let path_field = schema_builder.add_text_field("path", TEXT | STORED);
-        // filename is tokenized TEXT
-        let filename_field = schema_builder.add_text_field("filename", TEXT | STORED);
-        // ext is tokenized TEXT so both 'pdf' and '.pdf' match
-        let ext_field = schema_builder.add_text_field("ext", TEXT | STORED);
-        // size is indexed i64 for range queries
-        let size_field = schema_builder.add_i64_field("size", STORED | INDEXED | FAST);
-        // mod_time is indexed i64 for date range queries
-        let mod_time_field = schema_builder.add_i64_field("mod_time", STORED | INDEXED | FAST);
-        let hash_field = schema_builder.add_text_field("hash", STRING | STORED);
-        let is_ocr_field = schema_builder.add_text_field("is_ocr", STRING | STORED);
-        let content_field = schema_builder.add_text_field("content", TEXT | STORED);
-        let schema = schema_builder.build();
+        let (schema, fields) = Self::build_schema();
 
         let index = match Index::open_or_create(
             tantivy::directory::MmapDirectory::open(index_dir.as_ref())?,
@@ -92,23 +123,68 @@ impl Indexer {
             .try_into()?;
 
         // Allocate 50MB for writer buffer
-        let writer = Arc::new(Mutex::new(index.writer(50_000_000)?));
+        let writer = match index.writer(50_000_000) {
+            Ok(w) => Some(Arc::new(Mutex::new(w))),
+            Err(e) => {
+                return Err(format!(
+                    "Failed to acquire index write lock for {:?} ({}). If another instance of DocSearch is running, please use the existing window.",
+                    index_dir.as_ref(), e
+                ).into());
+            }
+        };
 
         Ok(Self {
             schema,
-            raw_path_field,
-            path_field,
-            filename_field,
-            ext_field,
-            size_field,
-            mod_time_field,
-            hash_field,
-            is_ocr_field,
-            content_field,
+            raw_path_field: fields.raw_path,
+            path_field: fields.path,
+            filename_field: fields.filename,
+            ext_field: fields.ext,
+            size_field: fields.size,
+            mod_time_field: fields.mod_time,
+            hash_field: fields.hash,
+            is_ocr_field: fields.is_ocr,
+            content_field: fields.content,
             index,
             reader,
             writer,
         })
+    }
+
+    /// Opens the index in read-only mode without acquiring Tantivy's exclusive writer lock.
+    /// This allows concurrent search, duplicate checking, and listing while the background service is indexing.
+    pub fn open_read_only<P: AsRef<Path>>(index_dir: P) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let (schema, fields) = Self::build_schema();
+
+        let index = Index::open_or_create(
+            tantivy::directory::MmapDirectory::open(index_dir.as_ref())?,
+            schema.clone(),
+        )?;
+
+        let reader = index
+            .reader_builder()
+            .reload_policy(ReloadPolicy::OnCommitWithDelay)
+            .try_into()?;
+
+        Ok(Self {
+            schema,
+            raw_path_field: fields.raw_path,
+            path_field: fields.path,
+            filename_field: fields.filename,
+            ext_field: fields.ext,
+            size_field: fields.size,
+            mod_time_field: fields.mod_time,
+            hash_field: fields.hash,
+            is_ocr_field: fields.is_ocr,
+            content_field: fields.content,
+            index,
+            reader,
+            writer: None,
+        })
+    }
+
+    #[allow(dead_code)]
+    pub fn is_read_only(&self) -> bool {
+        self.writer.is_none()
     }
 
     pub fn index_document(
@@ -135,7 +211,8 @@ impl Indexer {
         doc.add_text(self.is_ocr_field, if is_ocr { "true" } else { "false" });
         doc.add_text(self.content_field, content);
 
-        let writer = self.writer.lock().map_err(|e| e.to_string())?;
+        let writer_arc = self.writer.as_ref().ok_or("Indexer is open in read-only mode")?;
+        let writer = writer_arc.lock().map_err(|e| e.to_string())?;
         let term = Term::from_field_text(self.raw_path_field, path);
         writer.delete_term(term);
         writer.add_document(doc)?;
@@ -143,14 +220,16 @@ impl Indexer {
     }
 
     pub fn commit(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let mut writer = self.writer.lock().map_err(|e| e.to_string())?;
+        let writer_arc = self.writer.as_ref().ok_or("Indexer is open in read-only mode")?;
+        let mut writer = writer_arc.lock().map_err(|e| e.to_string())?;
         writer.commit()?;
         self.reader.reload()?;
         Ok(())
     }
 
     pub fn delete_document(&self, path: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let writer = self.writer.lock().map_err(|e| e.to_string())?;
+        let writer_arc = self.writer.as_ref().ok_or("Indexer is open in read-only mode")?;
+        let writer = writer_arc.lock().map_err(|e| e.to_string())?;
         let term = Term::from_field_text(self.raw_path_field, path);
         writer.delete_term(term);
         Ok(())

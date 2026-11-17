@@ -27,9 +27,15 @@ pub struct Config {
     pub excluded_dirs: Vec<String>,
     #[serde(default = "default_theme")]
     pub theme: String,
+    #[serde(default = "default_false")]
+    pub autostart: bool,
 
     #[serde(skip)]
     pub config_file_path: PathBuf,
+}
+
+fn default_false() -> bool {
+    false
 }
 
 fn default_index_path() -> String {
@@ -100,6 +106,7 @@ impl Default for Config {
             file_extensions: default_file_extensions(),
             excluded_dirs: default_excluded_dirs(),
             theme: default_theme(),
+            autostart: default_false(),
             config_file_path: config_path,
         }
     }
